@@ -81,6 +81,9 @@ const event = client.webhooks.unwrap({
 
 This repository publishes the npm package `@calle-ai/calle`.
 
+See [RELEASE.md](./RELEASE.md) for the release checklist, GitHub Actions
+workflow, and post-publish install smoke test.
+
 Prerequisites:
 
 - Create an npm automation token or granular access token that can publish
@@ -100,3 +103,9 @@ node --input-type=module -e 'import { CalleClient } from "@calle-ai/calle"; cons
 ```
 
 Use tag `latest` only after the beta package has been installed and tested.
+
+## Project Documents
+
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [SECURITY.md](./SECURITY.md)
+- [RELEASE.md](./RELEASE.md)
