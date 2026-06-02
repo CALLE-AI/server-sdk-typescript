@@ -3,6 +3,14 @@
   "version": "0.1.0-beta.1",
   "description": "TypeScript server SDK for the CALL-E Developer API.",
   "type": "module",
+  "keywords": [
+    "calle",
+    "call-e",
+    "voice-ai",
+    "server-sdk",
+    "webhooks"
+  ],
+  "sideEffects": false,
   "packageManager": "pnpm@8.10.2",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,7 +31,9 @@
     "example:create-and-wait": "tsx examples/create-and-wait.ts",
     "example:webhook": "tsx examples/webhook-server.ts",
     "test": "vitest run",
+    "typecheck:examples": "tsc --noEmit --module ESNext --moduleResolution Bundler --target ES2022 --strict --skipLibCheck --types node examples/create-and-wait.ts examples/webhook-server.ts",
     "test:package": "pnpm run build && node --input-type=module -e \"import('./dist/index.js').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\"",
+    "pack:check": "npm pack --dry-run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "publishConfig": {
