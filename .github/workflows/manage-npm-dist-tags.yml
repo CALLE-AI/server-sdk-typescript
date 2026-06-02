@@ -6,15 +6,16 @@ on:
       action:
         description: Dist-tag action.
         required: true
-        default: remove
+        default: list
         type: choice
         options:
+          - list
           - remove
           - add
       tag:
         description: npm dist-tag.
         required: true
-        default: latest
+        default: beta
       version:
         description: Package version. Required when action is add.
         required: false
@@ -47,7 +48,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ inputs.action }}" = "remove" ]; then
+          if [ "${{ inputs.action }}" = "list" ]; then
+            npm dist-tag ls @call-e/calle
+          elif [ "${{ inputs.action }}" = "remove" ]; then
             npm dist-tag rm @call-e/calle "${{ inputs.tag }}"
           else
             if [ -z "${{ inputs.version }}" ]; then
@@ -58,4 +61,6 @@ jobs:
             npm dist-tag add "@call-e/calle@${{ inputs.version }}" "${{ inputs.tag }}"
           fi
 
-          npm dist-tag ls @call-e/calle
+          if [ "${{ inputs.action }}" != "list" ]; then
+            npm dist-tag ls @call-e/calle
+          fi

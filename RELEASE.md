@@ -50,15 +50,19 @@ npm install @call-e/calle@beta
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
-## Latest promotion
+## Dist-tags
 
-Use the `latest` dist-tag only after the beta package has been installed and
-tested in at least one backend integration.
+npm currently reports both `beta` and `latest` for the first beta because this
+is the only published version. Developer docs should continue to use
+`@call-e/calle@beta` during the beta period.
+
+Move `latest` only after a stable package has been approved, installed from npm,
+and tested in at least one backend integration.
 
 ```bash
 # Option A: publish a new version with latest from the workflow.
 # Option B: promote an existing version after final approval.
-npm dist-tag add @call-e/calle@0.1.0-beta.1 latest
+npm dist-tag add @call-e/calle@<stable-version> latest
 ```
 
 Do not reuse a previously published version. npm package versions are immutable.
