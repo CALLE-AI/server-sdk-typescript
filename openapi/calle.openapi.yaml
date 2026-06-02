@@ -1,0 +1,666 @@
+openapi: 3.1.0
+info:
+  title: CALL-E Developer API
+  version: 0.1.0
+  description: Phase 1 Developer API contract used by the CALL-E TypeScript and Python SDKs.
+servers:
+  - url: https://api.example.com
+    description: Placeholder developer API base URL.
+security:
+  - bearerAuth: []
+paths:
+  /v1/calls:
+    post:
+      operationId: createCall
+      tags:
+        - calls
+      summary: Create Call
+      description: Create an asynchronous call.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCallRequest"
+            examples:
+              fridayLunch:
+                summary: US Friday lunch check.
+                value:
+                  task: Call the recipient and ask whether they can attend Friday lunch in San Francisco.
+                  recipient:
+                    phone: "+14155550100"
+                    region: US
+                    locale: en-US
+                  result_schema:
+                    type: object
+                    required:
+                      - can_attend
+                    properties:
+                      can_attend:
+                        type: string
+                        enum:
+                          - "yes"
+                          - "no"
+                          - unknown
+                    additionalProperties: false
+                  metadata:
+                    workflow_run_id: wf_123
+                  webhook_url: https://example.com/calle/webhook
+      responses:
+        "200":
+          description: Call accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Call"
+              examples:
+                completedFridayLunch:
+                  summary: Completed US Friday lunch check.
+                  value:
+                    id: call_123
+                    status: completed
+                    task: Call the recipient and ask whether they can attend Friday lunch in San Francisco.
+                    recipient:
+                      phone: "+14155550100"
+                      region: US
+                      locale: en-US
+                    structured_result:
+                      can_attend: "yes"
+                    result_validation:
+                      valid: true
+                    summary: The recipient can attend Friday lunch.
+                    transcript: null
+                    metadata:
+                      workflow_run_id: wf_123
+                    failure_code: null
+                    failure_message: null
+                    created_at: "2026-06-01T17:00:00Z"
+                    completed_at: "2026-06-01T17:01:00Z"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/calls/{call_id}:
+    get:
+      operationId: getCall
+      tags:
+        - calls
+      summary: Get Call
+      description: Get a call by id.
+      parameters:
+        - $ref: "#/components/parameters/CallId"
+      responses:
+        "200":
+          description: Current call state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Call"
+              examples:
+                completedFridayLunch:
+                  summary: Completed US Friday lunch check.
+                  value:
+                    id: call_123
+                    status: completed
+                    task: Call the recipient and ask whether they can attend Friday lunch in San Francisco.
+                    recipient:
+                      phone: "+14155550100"
+                      region: US
+                      locale: en-US
+                    structured_result:
+                      can_attend: "yes"
+                    result_validation:
+                      valid: true
+                    summary: The recipient can attend Friday lunch.
+                    transcript: null
+                    metadata:
+                      workflow_run_id: wf_123
+                    failure_code: null
+                    failure_message: null
+                    created_at: "2026-06-01T17:00:00Z"
+                    completed_at: "2026-06-01T17:01:00Z"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+  /v1/calls/{call_id}/events:
+    get:
+      operationId: listCallEvents
+      tags:
+        - calls
+      summary: List Call Events
+      description: List developer-facing call events.
+      parameters:
+        - $ref: "#/components/parameters/CallId"
+        - name: cursor
+          in: query
+          description: Cursor returned by the previous event page. Omit it to start at the first available event page for the call.
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of events to return in one page.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Call event page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventList"
+              examples:
+                callEvents:
+                  summary: US Friday lunch call events.
+                  value:
+                    object: list
+                    data:
+                      - id: evt_123
+                        type: call.completed
+                        call_id: call_123
+                        created_at: "2026-06-01T17:01:00Z"
+                        level: info
+                        status: completed
+                        message: Call completed.
+                        details:
+                          region: US
+                          locale: en-US
+                    next_cursor: null
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "403":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+  /calle/webhook:
+    post:
+      operationId: receiveWebhookEvent
+      tags:
+        - webhooks
+      summary: Server Message
+      description: CALL-E sends this request to your server when a call reaches a terminal state. Configure this URL with `webhook_url` on create call or through project-level webhook settings.
+      security: []
+      servers:
+        - url: https://{yourserver}
+          description: Your public webhook receiver host.
+          variables:
+            yourserver:
+              default: example.com
+              description: Hostname for your webhook receiver.
+      parameters:
+        - $ref: "#/components/parameters/WebhookEventId"
+        - $ref: "#/components/parameters/WebhookTimestamp"
+        - $ref: "#/components/parameters/WebhookSignature"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookEvent"
+            examples:
+              callCompleted:
+                summary: Completed US Friday lunch webhook.
+                value:
+                  id: evt_123
+                  type: call.completed
+                  created_at: "2026-06-01T17:01:00Z"
+                  data:
+                    object: call
+                    id: call_123
+                    status: completed
+                    structured_result:
+                      can_attend: "yes"
+                    result_validation:
+                      valid: true
+                    summary: The recipient can attend Friday lunch.
+                    metadata:
+                      workflow_run_id: wf_123
+      responses:
+        "200":
+          description: Webhook accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAcknowledgement"
+              examples:
+                accepted:
+                  summary: Acknowledge the webhook.
+                  value:
+                    ok: true
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate.
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+    CallId:
+      name: call_id
+      in: path
+      description: Public CALL-E call identifier returned by create call. It starts with `call_` and is safe to store in your workflow records.
+      required: true
+      schema:
+        type: string
+        pattern: "^call_[A-Za-z0-9_-]+$"
+    WebhookEventId:
+      name: CALL-E-Event-Id
+      in: header
+      description: Unique webhook event id. Store this value before side effects so duplicate deliveries can be ignored safely.
+      required: true
+      schema:
+        type: string
+        pattern: "^evt_[A-Za-z0-9_-]+$"
+      example: evt_123
+    WebhookTimestamp:
+      name: CALL-E-Timestamp
+      in: header
+      description: Unix timestamp used in the signed payload. Verify this header together with `CALL-E-Signature` before parsing JSON.
+      required: true
+      schema:
+        type: string
+      example: "1780309260"
+    WebhookSignature:
+      name: CALL-E-Signature
+      in: header
+      description: HMAC SHA-256 signature in the form `v1=<hex digest>`, computed over `timestamp + "." + raw_body` with your webhook secret.
+      required: true
+      schema:
+        type: string
+      example: v1=4d967f8f2b85f9c7d7f7ad1b9f8c5e3a5f1c2d3e4f5061728394050607080910
+  responses:
+    ErrorResponse:
+      description: Stable API error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    CreateCallRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - task
+        - recipient
+        - result_schema
+      properties:
+        task:
+          type: string
+          description: Natural-language instruction for the call. Include the goal, context the voice agent should know, and the exact information you want collected.
+          minLength: 1
+        recipient:
+          description: Person or phone endpoint CALL-E should dial.
+          $ref: "#/components/schemas/CallRecipient"
+        context:
+          type: object
+          description: Optional structured context for your own workflow. CALL-E stores and returns it only when relevant to orchestration; do not put secrets here.
+          additionalProperties: true
+        result_schema:
+          type: object
+          description: JSON Schema object that defines the structured result CALL-E should extract from the call. The terminal call result is validated against this schema.
+          additionalProperties: true
+        policy:
+          description: Optional Phase 1 call behavior policy. Phase 1 is intentionally conservative and supports one outbound attempt.
+          $ref: "#/components/schemas/CallPolicy"
+        metadata:
+          type: object
+          description: Optional caller-owned metadata echoed on the call and webhook payloads. Use this for workflow ids, tenant ids, or internal correlation keys.
+          additionalProperties: true
+        webhook_url:
+          type: string
+          description: Optional per-request HTTPS webhook URL. When provided, CALL-E sends terminal call events to this URL in addition to project-level webhook delivery.
+          format: uri
+    CallRecipient:
+      type: object
+      additionalProperties: false
+      properties:
+        phone:
+          type: string
+          description: Recipient phone number in E.164 format, for example `+14155550100`.
+        name:
+          type: string
+          description: Optional display name for the recipient. Use it when the call script should address the person by name.
+        locale:
+          type: string
+          description: BCP 47 locale hint for the conversation, for example `en-US`.
+        region:
+          type: string
+          description: Recipient country or region code used for routing and compliance checks, for example `US`.
+    CallPolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        max_attempts:
+          type: integer
+          description: Maximum outbound dial attempts. Phase 1 supports exactly one attempt.
+          minimum: 1
+          maximum: 1
+          default: 1
+        voicemail:
+          type: string
+          description: Voicemail policy. Phase 1 does not leave voicemail messages.
+          enum:
+            - do_not_leave
+          default: do_not_leave
+        on_not_ready:
+          type: string
+          description: Behavior when the call cannot start because the recipient, region, or provider state is not ready. Phase 1 returns an error instead of silently retrying.
+          enum:
+            - error
+          default: error
+    CallStatus:
+      type: string
+      description: Current lifecycle state of a CALL-E call.
+      enum:
+        - queued
+        - in_progress
+        - completed
+        - failed
+        - canceled
+    ResultValidation:
+      type: object
+      additionalProperties: false
+      required:
+        - valid
+      properties:
+        valid:
+          type: boolean
+          description: Whether `structured_result` matched the submitted `result_schema`.
+        error_code:
+          type: string
+          description: Machine-readable validation failure code when the structured result did not match the schema.
+        message:
+          type: string
+          description: Human-readable validation message suitable for logs and dashboards.
+    Call:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - status
+        - task
+        - recipient
+        - metadata
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Public CALL-E call identifier. Store this id to fetch call state, list events, and correlate webhooks.
+        status:
+          description: Current call lifecycle state.
+          $ref: "#/components/schemas/CallStatus"
+        task:
+          type: string
+          description: Original task instruction submitted when the call was created.
+        recipient:
+          description: Recipient details used for the call.
+          $ref: "#/components/schemas/CallRecipient"
+        structured_result:
+          type:
+            - object
+            - "null"
+          description: Structured result extracted from the call. Present on successful terminal calls when CALL-E can produce data matching `result_schema`; otherwise `null`.
+          additionalProperties: true
+        result_validation:
+          description: Validation outcome for `structured_result` against the submitted `result_schema`. `null` until a result has been produced.
+          oneOf:
+            - $ref: "#/components/schemas/ResultValidation"
+            - type: "null"
+        summary:
+          type:
+            - string
+            - "null"
+          description: Short human-readable summary of the conversation outcome. `null` while the call is still running or when no useful summary is available.
+        transcript:
+          type:
+            - string
+            - "null"
+          description: Transcript text when available. Phase 1 may return `null` if transcript capture is not enabled or not yet ready.
+        metadata:
+          type: object
+          description: Caller-owned metadata submitted on the create call request.
+          additionalProperties: true
+        failure_code:
+          type:
+            - string
+            - "null"
+          description: Machine-readable failure reason when `status` is `failed`; otherwise `null`.
+        failure_message:
+          type:
+            - string
+            - "null"
+          description: Human-readable failure explanation when `status` is `failed`; otherwise `null`.
+        created_at:
+          type: string
+          description: ISO 8601 timestamp when CALL-E accepted the call request.
+          format: date-time
+        completed_at:
+          type:
+            - string
+            - "null"
+          description: ISO 8601 timestamp when the call reached a terminal state. `null` while queued or in progress.
+          format: date-time
+    DeveloperEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - call_id
+        - created_at
+        - level
+        - status
+        - message
+        - details
+      properties:
+        id:
+          type: string
+          description: Public event identifier.
+        type:
+          type: string
+          description: Developer-facing event type, for example `call.completed`.
+        call_id:
+          type: string
+          description: Public CALL-E call identifier associated with this event.
+        created_at:
+          type: string
+          description: ISO 8601 timestamp when the event was emitted.
+          format: date-time
+        level:
+          type: string
+          description: Event severity for log routing and alerting.
+          enum:
+            - debug
+            - info
+            - warning
+            - error
+        status:
+          description: Call status at the time this event was emitted.
+          $ref: "#/components/schemas/CallStatus"
+        message:
+          type: string
+          description: Short human-readable event message.
+        details:
+          type: object
+          description: Event-specific structured details. Shape depends on the event type.
+          additionalProperties: true
+    EventList:
+      type: object
+      additionalProperties: false
+      required:
+        - object
+        - data
+      properties:
+        object:
+          type: string
+          description: Always `list` for paginated list responses.
+          enum:
+            - list
+        data:
+          type: array
+          description: Events in this page, ordered from oldest to newest for the requested cursor window.
+          items:
+            $ref: "#/components/schemas/DeveloperEvent"
+        next_cursor:
+          type:
+            - string
+            - "null"
+          description: Cursor for the next page. `null` means there are no more events.
+    WebhookEventType:
+      type: string
+      description: Terminal webhook event type.
+      enum:
+        - call.completed
+        - call.failed
+        - call.result_validation_failed
+    WebhookEvent:
+      type: object
+      description: Event payload CALL-E sends to your webhook receiver.
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - created_at
+        - data
+      properties:
+        id:
+          type: string
+          description: Unique webhook event id. Use it as an idempotency key when processing webhook side effects.
+        type:
+          description: Terminal event type for the call.
+          $ref: "#/components/schemas/WebhookEventType"
+        created_at:
+          type: string
+          description: ISO 8601 timestamp when CALL-E created this webhook event.
+          format: date-time
+        data:
+          description: Terminal call snapshot associated with the webhook event.
+          $ref: "#/components/schemas/WebhookCallData"
+    WebhookCallData:
+      type: object
+      description: Terminal call state included in webhook events.
+      additionalProperties: false
+      required:
+        - object
+        - id
+        - status
+      properties:
+        object:
+          type: string
+          description: Always `call` for terminal call webhook events.
+          enum:
+            - call
+        id:
+          type: string
+          description: Public CALL-E call identifier associated with the webhook.
+        status:
+          description: Terminal or current call lifecycle state.
+          $ref: "#/components/schemas/CallStatus"
+        structured_result:
+          type:
+            - object
+            - "null"
+          description: Structured result extracted from the call. Present for successful terminal calls when available.
+          additionalProperties: true
+        result_validation:
+          description: Validation result for `structured_result` against the submitted `result_schema`.
+          oneOf:
+            - $ref: "#/components/schemas/ResultValidation"
+            - type: "null"
+        summary:
+          type:
+            - string
+            - "null"
+          description: Human-readable summary of the conversation outcome.
+        metadata:
+          type: object
+          description: Caller-owned metadata copied from the create call request.
+          additionalProperties: true
+        failure_code:
+          type:
+            - string
+            - "null"
+          description: Machine-readable failure reason when the call failed.
+        failure_message:
+          type:
+            - string
+            - "null"
+          description: Human-readable failure explanation when the call failed.
+    WebhookAcknowledgement:
+      type: object
+      description: Example acknowledgement response from your webhook receiver. CALL-E treats any 2xx response as delivered and ignores the response body.
+      additionalProperties: true
+      properties:
+        ok:
+          type: boolean
+          description: Optional acknowledgement flag returned by your server.
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/APIError"
+    APIError:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - details
+      properties:
+        code:
+          type: string
+          enum:
+            - invalid_request
+            - unauthorized
+            - forbidden
+            - rate_limit_exceeded
+            - insufficient_balance
+            - unsupported_region
+            - unsupported_language
+            - recipient_blocked
+            - policy_violation
+            - call_not_ready
+            - idempotency_conflict
+            - provider_unavailable
+            - internal_error
+            - not_found
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

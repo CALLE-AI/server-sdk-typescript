@@ -1,0 +1,45 @@
+{
+  "name": "@calle-ai/calle",
+  "version": "0.1.0-beta.1",
+  "description": "TypeScript server SDK for the CALL-E Developer API.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "generate": "openapi-typescript openapi/calle.openapi.yaml -o src/generated/schema.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CALLE-AI/server-sdk-typescript.git"
+  },
+  "homepage": "https://github.com/CALLE-AI/server-sdk-typescript#readme",
+  "bugs": {
+    "url": "https://github.com/CALLE-AI/server-sdk-typescript/issues"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "openapi-typescript": "^7.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0"
+  }
+}
