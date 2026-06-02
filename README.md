@@ -5,10 +5,31 @@ TypeScript server SDK for the CALL-E Developer API.
 Use this SDK from backend services, workers, and other trusted server
 environments. Do not expose CALL-E API keys in browser code.
 
+## Documentation
+
+- Developer docs: <http://8.222.221.91:5204/calle-docs-site/>
+- SDK guide: <http://8.222.221.91:5204/calle-docs-site/#/sdks>
+- API Reference: <http://8.222.221.91:5204/calle-docs-site/#/api-reference>
+- Webhooks: <http://8.222.221.91:5204/calle-docs-site/#/webhooks>
+- Changelog: <http://8.222.221.91:5204/calle-docs-site/#/changelog>
+
 ## Install
+
+The package name is planned for the first beta release, but it has not been
+published to npm yet.
+
+After the beta package is published:
 
 ```bash
 pnpm add @calle-ai/calle
+```
+
+Before the first registry publish, use a local checkout for development and
+package smoke tests:
+
+```bash
+pnpm install
+pnpm run test:tarball
 ```
 
 ## Examples
