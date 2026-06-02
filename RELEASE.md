@@ -25,6 +25,7 @@ pnpm run typecheck
 pnpm run typecheck:examples
 pnpm run test:package
 pnpm run pack:check
+pnpm run test:tarball
 ```
 
 The CI workflow runs the same package checks on `main`.

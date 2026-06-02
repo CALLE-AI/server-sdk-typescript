@@ -42,3 +42,6 @@ jobs:
 
       - name: Check package tarball
         run: pnpm run pack:check
+
+      - name: Smoke test tarball install
+        run: pnpm run test:tarball
