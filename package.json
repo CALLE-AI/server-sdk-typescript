@@ -20,6 +20,7 @@
     "generate": "openapi-typescript openapi/calle.openapi.yaml -o src/generated/schema.ts",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:package": "pnpm run build && node --input-type=module -e \"import('./dist/index.js').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "publishConfig": {

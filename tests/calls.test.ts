@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CalleClient, CalleAPIError, CalleTimeoutError } from "../src/index";
+import { CalleClient, CalleAPIError, CalleTimeoutError } from "../src/index.js";
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body), {

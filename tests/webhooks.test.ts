@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { CalleClient, CalleWebhookSignatureError } from "../src/index";
+import { CalleClient, CalleWebhookSignatureError } from "../src/index.js";
 
 function sign(rawBody: Buffer, timestamp: string, secret: string): string {
   const signedPayload = Buffer.concat([Buffer.from(`${timestamp}.`, "utf8"), rawBody]);

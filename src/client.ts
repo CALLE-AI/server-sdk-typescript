@@ -1,5 +1,5 @@
-import { CalleCalls } from "./calls";
-import { CalleWebhooks } from "./webhooks";
+import { CalleCalls } from "./calls.js";
+import { CalleWebhooks } from "./webhooks.js";
 
 type FetchLike = (input: Request) => Promise<Response>;
 

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { components } from "./generated/schema";
-import { CalleWebhookSignatureError } from "./errors";
+import type { components } from "./generated/schema.js";
+import { CalleWebhookSignatureError } from "./errors.js";
 
 export type WebhookEvent = components["schemas"]["WebhookEvent"];
 

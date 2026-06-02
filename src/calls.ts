@@ -1,6 +1,6 @@
 import createClient, { type Client } from "openapi-fetch";
-import type { components, paths } from "./generated/schema";
-import { CalleConnectionError, CalleTimeoutError, apiErrorFromResponse } from "./errors";
+import type { components, paths } from "./generated/schema.js";
+import { CalleConnectionError, CalleTimeoutError, apiErrorFromResponse } from "./errors.js";
 
 type ApiCall = components["schemas"]["Call"];
 type ApiCreateCallRequest = components["schemas"]["CreateCallRequest"];
