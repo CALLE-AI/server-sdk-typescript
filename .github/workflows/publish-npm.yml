@@ -52,6 +52,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify OpenAPI contract
+        run: pnpm run verify:openapi
+
       - name: Run tests
         run: pnpm run test
 

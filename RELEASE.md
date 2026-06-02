@@ -20,6 +20,7 @@ Run these checks before publishing:
 
 ```bash
 pnpm install
+pnpm run verify:openapi
 pnpm run test
 pnpm run typecheck
 pnpm run typecheck:examples

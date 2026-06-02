@@ -31,6 +31,7 @@
     "example:create-and-wait": "tsx examples/create-and-wait.ts",
     "example:webhook": "tsx examples/webhook-server.ts",
     "test": "vitest run",
+    "verify:openapi": "node scripts/verify-openapi-contract.mjs",
     "typecheck:examples": "tsc --noEmit --module ESNext --moduleResolution Bundler --target ES2022 --strict --skipLibCheck --types node examples/create-and-wait.ts examples/webhook-server.ts",
     "test:package": "pnpm run build && node --input-type=module -e \"import('./dist/index.js').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\"",
     "test:tarball": "pnpm run build && rm -f calle-ai-calle-*.tgz && tarball=$(npm pack --silent) && smoke_dir=$(mktemp -d) && cd \"$smoke_dir\" && npm init -y >/dev/null && npm install \"$OLDPWD/$tarball\" >/dev/null && node --input-type=module -e \"import('@calle-ai/calle').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\"",
@@ -56,6 +57,7 @@
     "openapi-typescript": "^7.0.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "yaml": "^2.9.0"
   }
 }

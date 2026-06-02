@@ -29,6 +29,7 @@ package smoke tests:
 
 ```bash
 pnpm install
+pnpm run verify:openapi
 pnpm run test:tarball
 ```
 
