@@ -75,7 +75,20 @@ jobs:
         run: npm publish --access public --tag "${{ inputs.tag }}" --registry https://registry.npmjs.org
 
       - name: Verify published package
-        run: npm view @call-e/calle dist-tags version
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if npm view @call-e/calle dist-tags version; then
+              exit 0
+            fi
+
+            echo "Package metadata is not visible yet, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "::error::Published package metadata did not become visible in time."
+          exit 1
 
       - name: Smoke test published package install
         run: |
@@ -84,5 +97,16 @@ jobs:
           smoke_dir="$(mktemp -d)"
           cd "$smoke_dir"
           npm init -y >/dev/null
-          npm install "@call-e/calle@${{ inputs.tag }}"
-          node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; if (typeof CalleClient !== "function") process.exit(1);'
+
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if npm install "@call-e/calle@${{ inputs.tag }}"; then
+              node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; if (typeof CalleClient !== "function") process.exit(1);'
+              exit 0
+            fi
+
+            echo "Package install is not available yet, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "::error::Published package install did not become available in time."
+          exit 1

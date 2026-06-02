@@ -15,17 +15,13 @@ environments. Do not expose CALL-E API keys in browser code.
 
 ## Install
 
-The package name is planned for the first beta release, but it has not been
-published to npm yet.
-
-After the beta package is published:
+Install the beta package from npm:
 
 ```bash
-pnpm add @call-e/calle
+pnpm add @call-e/calle@beta
 ```
 
-Before the first registry publish, use a local checkout for development and
-package smoke tests:
+Use a local checkout for development and package smoke tests:
 
 ```bash
 pnpm install

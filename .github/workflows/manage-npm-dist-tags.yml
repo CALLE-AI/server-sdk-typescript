@@ -1,0 +1,61 @@
+name: Manage npm dist-tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Dist-tag action.
+        required: true
+        default: remove
+        type: choice
+        options:
+          - remove
+          - add
+      tag:
+        description: npm dist-tag.
+        required: true
+        default: latest
+      version:
+        description: Package version. Required when action is add.
+        required: false
+
+jobs:
+  manage:
+    runs-on: ubuntu-latest
+    environment: npm
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14.0"
+
+      - name: Configure npm token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::Missing GitHub Actions secret NPM_TOKEN."
+            exit 1
+          fi
+
+          npm config set //registry.npmjs.org/:_authToken "$NODE_AUTH_TOKEN"
+
+      - name: Manage dist-tag
+        run: |
+          set -euo pipefail
+
+          if [ "${{ inputs.action }}" = "remove" ]; then
+            npm dist-tag rm @call-e/calle "${{ inputs.tag }}"
+          else
+            if [ -z "${{ inputs.version }}" ]; then
+              echo "::error::version is required when action is add."
+              exit 1
+            fi
+
+            npm dist-tag add "@call-e/calle@${{ inputs.version }}" "${{ inputs.tag }}"
+          fi
+
+          npm dist-tag ls @call-e/calle

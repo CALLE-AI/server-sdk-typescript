@@ -5,14 +5,16 @@ This repository publishes the TypeScript server SDK package
 
 ## Current status
 
-The package source, CI, and publish workflow are ready. The first registry
-publish still requires one of these release identities:
+The first beta is published to npm:
+
+```text
+@call-e/calle@0.1.0-beta.1
+```
+
+Future releases require one of these release identities:
 
 - GitHub Actions secret `NPM_TOKEN`, or
 - npm Trusted Publishing configured for this repository and workflow.
-
-Until the first beta is published, use a local checkout for examples and
-integration testing.
 
 ## Release gates
 
