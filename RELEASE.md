@@ -20,13 +20,7 @@ Run these checks before publishing:
 
 ```bash
 pnpm install
-pnpm run verify:openapi
-pnpm run test
-pnpm run typecheck
-pnpm run typecheck:examples
-pnpm run test:package
-pnpm run pack:check
-pnpm run test:tarball
+pnpm run validate
 ```
 
 The CI workflow runs the same package checks on `main`.

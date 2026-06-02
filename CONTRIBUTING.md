@@ -7,11 +7,7 @@ for trusted backend services, workers, and automation systems.
 
 ```bash
 pnpm install
-pnpm run test
-pnpm run typecheck
-pnpm run typecheck:examples
-pnpm run test:package
-pnpm run pack:check
+pnpm run validate
 ```
 
 ## Local examples

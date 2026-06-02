@@ -36,6 +36,7 @@
     "test:package": "pnpm run build && node --input-type=module -e \"import('./dist/index.js').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\"",
     "test:tarball": "pnpm run build && rm -f calle-ai-calle-*.tgz && tarball=$(npm pack --silent) && smoke_dir=$(mktemp -d) && cd \"$smoke_dir\" && npm init -y >/dev/null && npm install \"$OLDPWD/$tarball\" >/dev/null && node --input-type=module -e \"import('@calle-ai/calle').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\"",
     "pack:check": "npm pack --dry-run",
+    "validate": "pnpm run verify:openapi && pnpm run test && pnpm run typecheck && pnpm run typecheck:examples && pnpm run test:package && pnpm run pack:check && pnpm run test:tarball",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "publishConfig": {

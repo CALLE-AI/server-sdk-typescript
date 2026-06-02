@@ -52,26 +52,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify OpenAPI contract
-        run: pnpm run verify:openapi
-
-      - name: Run tests
-        run: pnpm run test
-
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Typecheck examples
-        run: pnpm run typecheck:examples
-
-      - name: Validate package build
-        run: pnpm run test:package
-
-      - name: Check package tarball
-        run: pnpm run pack:check
-
-      - name: Smoke test tarball install
-        run: pnpm run test:tarball
+      - name: Run validation
+        run: pnpm run validate
 
       - name: Publish with npm token
         if: inputs.auth == 'token'
