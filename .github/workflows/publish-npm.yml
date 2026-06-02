@@ -58,3 +58,13 @@ jobs:
 
       - name: Verify published package
         run: npm view @calle-ai/calle dist-tags version
+
+      - name: Smoke test published package install
+        run: |
+          set -euo pipefail
+
+          smoke_dir="$(mktemp -d)"
+          cd "$smoke_dir"
+          npm init -y >/dev/null
+          npm install "@calle-ai/calle@${{ inputs.tag }}"
+          node --input-type=module -e 'import { CalleClient } from "@calle-ai/calle"; if (typeof CalleClient !== "function") process.exit(1);'
