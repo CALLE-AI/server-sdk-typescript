@@ -50,3 +50,27 @@ const event = client.webhooks.unwrap({
   secret: process.env.CALLE_WEBHOOK_SECRET!
 });
 ```
+
+## Release
+
+This repository publishes the npm package `@calle-ai/calle`.
+
+Prerequisites:
+
+- Create an npm automation token or granular access token that can publish
+  `@calle-ai/calle`.
+- Add it to this repository as the GitHub Actions secret `NPM_TOKEN`.
+- Keep the package version in `package.json` unique before each publish.
+
+Manual beta publish:
+
+1. Open the `Publish npm package` GitHub Actions workflow.
+2. Run it from `main` with tag `beta`.
+3. Verify install in a temporary project:
+
+```bash
+pnpm add @calle-ai/calle@beta
+node --input-type=module -e 'import { CalleClient } from "@calle-ai/calle"; console.log(typeof CalleClient)'
+```
+
+Use tag `latest` only after the beta package has been installed and tested.
