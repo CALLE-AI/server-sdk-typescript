@@ -75,7 +75,7 @@ jobs:
         run: npm publish --access public --tag "${{ inputs.tag }}" --registry https://registry.npmjs.org
 
       - name: Verify published package
-        run: npm view @calle-ai/calle dist-tags version
+        run: npm view @call-e/calle dist-tags version
 
       - name: Smoke test published package install
         run: |
@@ -84,5 +84,5 @@ jobs:
           smoke_dir="$(mktemp -d)"
           cd "$smoke_dir"
           npm init -y >/dev/null
-          npm install "@calle-ai/calle@${{ inputs.tag }}"
-          node --input-type=module -e 'import { CalleClient } from "@calle-ai/calle"; if (typeof CalleClient !== "function") process.exit(1);'
+          npm install "@call-e/calle@${{ inputs.tag }}"
+          node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; if (typeof CalleClient !== "function") process.exit(1);'

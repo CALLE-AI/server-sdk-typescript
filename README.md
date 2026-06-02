@@ -1,4 +1,4 @@
-# @calle-ai/calle
+# @call-e/calle
 
 TypeScript server SDK for the CALL-E Developer API.
 
@@ -21,7 +21,7 @@ published to npm yet.
 After the beta package is published:
 
 ```bash
-pnpm add @calle-ai/calle
+pnpm add @call-e/calle
 ```
 
 Before the first registry publish, use a local checkout for development and
@@ -61,7 +61,7 @@ The webhook receiver listens on `POST /calle/webhook` and verifies
 ## Quickstart
 
 ```ts
-import { CalleClient } from "@calle-ai/calle";
+import { CalleClient } from "@call-e/calle";
 
 const client = new CalleClient({
   apiKey: process.env.CALLE_API_KEY!,
@@ -100,7 +100,7 @@ const event = client.webhooks.unwrap({
 
 ## Release
 
-This repository publishes the npm package `@calle-ai/calle`.
+This repository publishes the npm package `@call-e/calle`.
 
 See [RELEASE.md](./RELEASE.md) for the release checklist, GitHub Actions
 workflow, and post-publish install smoke test.
@@ -108,7 +108,7 @@ workflow, and post-publish install smoke test.
 Prerequisites:
 
 - Create an npm automation token or granular access token that can publish
-  `@calle-ai/calle`.
+  `@call-e/calle`.
 - Add it to this repository as the GitHub Actions secret `NPM_TOKEN`.
 - Keep the package version in `package.json` unique before each publish.
 
@@ -119,8 +119,8 @@ Manual beta publish:
 3. Verify install in a temporary project:
 
 ```bash
-pnpm add @calle-ai/calle@beta
-node --input-type=module -e 'import { CalleClient } from "@calle-ai/calle"; console.log(typeof CalleClient)'
+pnpm add @call-e/calle@beta
+node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
 Use tag `latest` only after the beta package has been installed and tested.

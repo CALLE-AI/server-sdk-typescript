@@ -1,7 +1,7 @@
 # Release
 
 This repository publishes the TypeScript server SDK package
-`@calle-ai/calle`.
+`@call-e/calle`.
 
 ## Current status
 
@@ -39,13 +39,13 @@ The CI workflow runs the same package checks on `main`.
 Manual verification:
 
 ```bash
-npm view @calle-ai/calle dist-tags version
+npm view @call-e/calle dist-tags version
 
 tmpdir="$(mktemp -d)"
 cd "$tmpdir"
 npm init -y
-npm install @calle-ai/calle@beta
-node --input-type=module -e 'import { CalleClient } from "@calle-ai/calle"; console.log(typeof CalleClient)'
+npm install @call-e/calle@beta
+node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
 ## Latest promotion
@@ -56,7 +56,7 @@ tested in at least one backend integration.
 ```bash
 # Option A: publish a new version with latest from the workflow.
 # Option B: promote an existing version after final approval.
-npm dist-tag add @calle-ai/calle@0.1.0-beta.1 latest
+npm dist-tag add @call-e/calle@0.1.0-beta.1 latest
 ```
 
 Do not reuse a previously published version. npm package versions are immutable.
@@ -64,7 +64,7 @@ Do not reuse a previously published version. npm package versions are immutable.
 ## Registry identity notes
 
 Token-based publishing requires an npm automation token or granular access token
-with publish access for `@calle-ai/calle`.
+with publish access for `@call-e/calle`.
 
 npm Trusted Publishing is preferred once the repository is ready for public
 release. The workflow uses a GitHub-hosted runner, Node.js 22.14.0, and upgrades
