@@ -71,13 +71,21 @@ Token-based publishing requires an npm automation token or granular access token
 with publish access for `@calle-ai/calle`.
 
 npm Trusted Publishing is preferred once the repository is ready for public
-release. Configure it on npm for:
+release. The workflow uses a GitHub-hosted runner, Node.js 22.14.0, and upgrades
+npm to 11.5.1 or newer when auth `trusted-publishing` is selected.
+
+Configure the trusted publisher on npm for:
 
 - Owner: `CALLE-AI`
 - Repository: `server-sdk-typescript`
 - Workflow filename: `publish-npm.yml`
 - Environment name: `npm`
+- Permission: allow `npm publish`
 
 When using Trusted Publishing, run the workflow with auth
 `trusted-publishing`. When using an npm token, run it with auth `token` and
 configure the GitHub Actions secret `NPM_TOKEN`.
+
+If the package already has token-based publishing enabled, first verify a
+Trusted Publishing beta release, then consider restricting token-based publishing
+in npm package settings.
