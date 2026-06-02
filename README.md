@@ -11,6 +11,32 @@ environments. Do not expose CALL-E API keys in browser code.
 pnpm add @calle-ai/calle
 ```
 
+## Examples
+
+Set the API key before running call examples:
+
+```bash
+export CALLE_API_KEY="calle_test_key"
+export CALLE_BASE_URL="https://api.example.com"
+export CALLE_EXAMPLE_PHONE="+14155550100"
+```
+
+Run the create-and-wait example from a local checkout:
+
+```bash
+pnpm run example:create-and-wait
+```
+
+Run the webhook receiver example:
+
+```bash
+export CALLE_WEBHOOK_SECRET="whsec_test_key"
+pnpm run example:webhook
+```
+
+The webhook receiver listens on `POST /calle/webhook` and verifies
+`CALL-E-Timestamp` and `CALL-E-Signature` against the raw request body.
+
 ## Quickstart
 
 ```ts

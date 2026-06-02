@@ -1,4 +1,4 @@
-import { CalleClient } from "../src/index";
+import { CalleClient } from "../src/index.js";
 
 const client = new CalleClient({
   apiKey: process.env.CALLE_API_KEY ?? "calle_dev_example",
