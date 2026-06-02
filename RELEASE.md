@@ -36,7 +36,8 @@ The CI workflow runs the same package checks on `main`.
 2. Confirm GitHub Actions secret `NPM_TOKEN` is configured, unless the package
    has been moved to npm Trusted Publishing.
 3. Open the `Publish npm package` workflow in GitHub Actions.
-4. Run the workflow from `main` with tag `beta`.
+4. Run the workflow from `main` with tag `beta` and the selected release
+   identity.
 5. Confirm the workflow completes the post-publish install smoke test.
 
 Manual verification:
@@ -75,3 +76,8 @@ release. Configure it on npm for:
 - Owner: `CALLE-AI`
 - Repository: `server-sdk-typescript`
 - Workflow filename: `publish-npm.yml`
+- Environment name: `npm`
+
+When using Trusted Publishing, run the workflow with auth
+`trusted-publishing`. When using an npm token, run it with auth `token` and
+configure the GitHub Actions secret `NPM_TOKEN`.

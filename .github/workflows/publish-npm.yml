@@ -11,10 +11,23 @@ on:
         options:
           - beta
           - latest
+      auth:
+        description: Release identity to use.
+        required: true
+        default: token
+        type: choice
+        options:
+          - token
+          - trusted-publishing
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: npm
+
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout
@@ -29,9 +42,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: pnpm
-          registry-url: "https://registry.npmjs.org"
-          scope: "@calle-ai"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -51,10 +61,24 @@ jobs:
       - name: Check package tarball
         run: pnpm run pack:check
 
-      - name: Publish
-        run: npm publish --access public --tag "${{ inputs.tag }}"
+      - name: Publish with npm token
+        if: inputs.auth == 'token'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::Missing GitHub Actions secret NPM_TOKEN."
+            exit 1
+          fi
+
+          npm config set //registry.npmjs.org/:_authToken "$NODE_AUTH_TOKEN"
+          npm publish --access public --tag "${{ inputs.tag }}" --registry https://registry.npmjs.org
+
+      - name: Publish with npm Trusted Publishing
+        if: inputs.auth == 'trusted-publishing'
+        run: npm publish --access public --tag "${{ inputs.tag }}" --registry https://registry.npmjs.org
 
       - name: Verify published package
         run: npm view @calle-ai/calle dist-tags version
