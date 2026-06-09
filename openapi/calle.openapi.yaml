@@ -4,7 +4,7 @@ info:
   version: 0.1.0
   description: Phase 1 Developer API contract used by the CALL-E TypeScript and Python SDKs.
 servers:
-  - url: https://api.example.com
+  - url: https://api.heycall-e.com
     description: Placeholder developer API base URL.
 security:
   - bearerAuth: []

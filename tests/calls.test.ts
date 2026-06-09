@@ -25,6 +25,21 @@ const completedCall = {
 };
 
 describe("CalleClient calls", () => {
+  it("uses the production API base URL by default", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      expect(request.url).toBe("https://api.heycall-e.com/v1/calls");
+      return jsonResponse(completedCall);
+    });
+    const client = new CalleClient({ apiKey: "key_test", fetch: fetchMock });
+
+    await client.calls.create({
+      task: "Call.",
+      recipient: { phone: "+14155550100", region: "US", locale: "en-US" },
+      resultSchema: { type: "object", properties: {} }
+    });
+  });
+
   it("creates calls with auth and idempotency headers", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
@@ -38,7 +53,7 @@ describe("CalleClient calls", () => {
       });
       return jsonResponse(completedCall);
     });
-    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.example.com", fetch: fetchMock });
+    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
 
     const call = await client.calls.create(
       {
@@ -61,7 +76,7 @@ describe("CalleClient calls", () => {
         { status: 409 }
       )
     );
-    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.example.com", fetch: fetchMock });
+    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
 
     await expect(
       client.calls.create({
@@ -81,7 +96,7 @@ describe("CalleClient calls", () => {
       .fn()
       .mockResolvedValueOnce(jsonResponse(queued))
       .mockResolvedValueOnce(jsonResponse(completedCall));
-    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.example.com", fetch: fetchMock });
+    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
 
     const call = await client.calls.waitForResult("call_123", { intervalMs: 1, timeoutMs: 500 });
 
@@ -97,7 +112,7 @@ describe("CalleClient calls", () => {
       completed_at: "2026-05-31T00:01:00Z"
     };
     const fetchMock = vi.fn(async () => jsonResponse(failed));
-    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.example.com", fetch: fetchMock });
+    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
 
     const call = await client.calls.waitForResult("call_123", { intervalMs: 1, timeoutMs: 500 });
 
@@ -108,7 +123,7 @@ describe("CalleClient calls", () => {
   it("raises CalleTimeoutError when wait timeout is reached", async () => {
     const queued = { ...completedCall, status: "queued", structured_result: null, completed_at: null };
     const fetchMock = vi.fn(async () => jsonResponse(queued));
-    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.example.com", fetch: fetchMock });
+    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
 
     await expect(client.calls.waitForResult("call_123", { intervalMs: 1, timeoutMs: 2 })).rejects.toBeInstanceOf(
       CalleTimeoutError

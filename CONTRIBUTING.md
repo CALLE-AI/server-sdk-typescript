@@ -14,7 +14,7 @@ pnpm run validate
 
 ```bash
 export CALLE_API_KEY="calle_test_key"
-export CALLE_BASE_URL="https://api.example.com"
+export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_EXAMPLE_PHONE="+14155550100"
 pnpm run example:create-and-wait
 

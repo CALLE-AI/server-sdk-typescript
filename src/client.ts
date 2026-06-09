@@ -14,7 +14,7 @@ export class CalleClient {
   readonly webhooks: CalleWebhooks;
 
   constructor(options: CalleClientOptions) {
-    const baseUrl = options.baseUrl ?? "https://api.example.com";
+    const baseUrl = options.baseUrl ?? "https://api.heycall-e.com";
     this.calls =
       options.fetch !== undefined
         ? new CalleCalls({ apiKey: options.apiKey, baseUrl, fetch: options.fetch })

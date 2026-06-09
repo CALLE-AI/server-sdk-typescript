@@ -15,10 +15,16 @@ environments. Do not expose CALL-E API keys in browser code.
 
 ## Install
 
-Install the beta package from npm:
+Install the stable package from npm:
 
 ```bash
-pnpm add @call-e/calle@beta
+pnpm add @call-e/calle
+```
+
+Pin the first stable release when your deployment process requires exact package reproducibility:
+
+```bash
+pnpm add @call-e/calle@0.1.0
 ```
 
 Use a local checkout for development and package smoke tests:
@@ -34,7 +40,7 @@ Set the API key before running call examples:
 
 ```bash
 export CALLE_API_KEY="calle_test_key"
-export CALLE_BASE_URL="https://api.example.com"
+export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_EXAMPLE_PHONE="+14155550100"
 ```
 
@@ -61,7 +67,7 @@ import { CalleClient } from "@call-e/calle";
 
 const client = new CalleClient({
   apiKey: process.env.CALLE_API_KEY!,
-  baseUrl: "https://api.example.com"
+  baseUrl: "https://api.heycall-e.com"
 });
 
 const call = await client.calls.createAndWait(
@@ -108,18 +114,19 @@ Prerequisites:
 - Add it to this repository as the GitHub Actions secret `NPM_TOKEN`.
 - Keep the package version in `package.json` unique before each publish.
 
-Manual beta publish:
+Manual stable publish:
 
-1. Open the `Publish npm package` GitHub Actions workflow.
-2. Run it from `main` with tag `beta`.
-3. Verify install in a temporary project:
+1. Confirm `package.json` has a unique stable version.
+2. Open the `Publish npm package` GitHub Actions workflow.
+3. Run it from `main` with tag `latest`.
+4. Verify install in a temporary project:
 
 ```bash
-pnpm add @call-e/calle@beta
+pnpm add @call-e/calle
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
-Use tag `latest` only after the beta package has been installed and tested.
+The first stable version is `0.1.0`. Do not reuse a previously published npm version.
 
 ## Project Documents
 
