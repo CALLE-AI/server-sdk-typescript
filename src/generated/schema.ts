@@ -13,7 +13,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create an asynchronous call. */
+        /**
+         * Create Call
+         * @description Create an asynchronous call.
+         */
         post: operations["createCall"];
         delete?: never;
         options?: never;
@@ -28,7 +31,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get a call by id. */
+        /**
+         * Get Call
+         * @description Get a call by id.
+         */
         get: operations["getCall"];
         put?: never;
         post?: never;
@@ -45,10 +51,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List developer-facing call events. */
+        /**
+         * List Call Events
+         * @description List developer-facing call events.
+         */
         get: operations["listCallEvents"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/calle/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Server Message
+         * @description CALL-E sends this request to your server when a call reaches a terminal state. Configure this URL with `webhook_url` on create call or through project-level webhook settings.
+         */
+        post: operations["receiveWebhookEvent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -60,121 +89,234 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         CreateCallRequest: {
+            /** @description Natural-language instruction for the call task. Include the goal, relevant details the voice agent should know, and the exact information you want collected. */
             task: string;
-            recipient: components["schemas"]["CallRecipient"];
-            context?: {
+            /** @description Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use. */
+            recipients?: components["schemas"]["CallTaskRecipientRequest"][] | null;
+            /** @description Optional JSON Schema object that defines the structured result CALL-E should extract for the whole call task. Object schemas are strict by default; fields not declared in `properties` are rejected. */
+            result_schema?: {
                 [key: string]: unknown;
-            };
-            result_schema: {
+            } | null;
+            /** @description Optional JSON Schema object that defines the structured result CALL-E should extract for each recipient. Object schemas are strict by default; fields not declared in `properties` are rejected. */
+            recipient_result_schema?: {
                 [key: string]: unknown;
-            };
-            policy?: components["schemas"]["CallPolicy"];
+            } | null;
+            /** @description Optional caller-owned metadata echoed on the call and webhook payloads. Use this for workflow ids, tenant ids, or internal correlation keys. */
             metadata?: {
                 [key: string]: unknown;
             };
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description Optional per-request HTTPS webhook URL. When provided, CALL-E sends terminal call events to this URL in addition to project-level webhook delivery.
+             */
             webhook_url?: string;
         };
-        CallRecipient: {
-            /** @description E.164 phone number. */
-            phone?: string;
-            name?: string;
-            locale?: string;
-            region?: string;
+        CallTaskRecipientRequest: {
+            /** @description Phone numbers in E.164 format for this recipient. Replace placeholders such as `<RECIPIENT_1_E164_PHONE>` with phone numbers you own or are authorized to call. */
+            phones: string[];
+            /** @description BCP 47 locale hint for the conversation, for example `en-US`. */
+            locale?: string | null;
+            /** @description Recipient country or region code used for routing and compliance checks, for example `US`. */
+            region?: string | null;
         };
-        CallPolicy: {
-            /** @default 1 */
-            max_attempts: number;
-            /**
-             * @default do_not_leave
-             * @enum {string}
-             */
-            voicemail: "do_not_leave";
-            /**
-             * @default error
-             * @enum {string}
-             */
-            on_not_ready: "error";
-        };
-        /** @enum {string} */
+        /**
+         * @description Current lifecycle state of a CALL-E call.
+         * @enum {string}
+         */
         CallStatus: "queued" | "in_progress" | "completed" | "failed" | "canceled";
-        ResultValidation: {
-            valid: boolean;
-            error_code?: string;
-            message?: string;
+        CompletionConfidence: {
+            /** @description Confidence score in the 0 to 1 range for CALL-E's task completion judgment. */
+            score: number;
+            /** @description Confidence label for the task completion judgment, for example `low`, `medium`, or `high`. */
+            label: string;
         };
-        Call: {
+        /**
+         * @description Current lifecycle state for one recipient in a call task.
+         * @enum {string}
+         */
+        RecipientStatus: "pending" | "in_progress" | "completed" | "failed" | "skipped";
+        /**
+         * @description Current lifecycle state for one outbound dial attempt.
+         * @enum {string}
+         */
+        AttemptStatus: "queued" | "dialing" | "in_progress" | "completed" | "failed" | "canceled";
+        /**
+         * @description Speaker label for one transcript turn.
+         * @enum {string}
+         */
+        TranscriptSpeaker: "bot" | "user" | "unknown";
+        CallTranscriptTurn: {
+            /** @description Seconds from the start of the attempt. `null` when the source line did not include a parseable timestamp. */
+            offset_seconds: number | null;
+            /** @description Speaker for this transcript turn. */
+            speaker: components["schemas"]["TranscriptSpeaker"];
+            /** @description Spoken text for this transcript turn. */
+            text: string;
+        };
+        CallTaskAttempt: {
+            /** @description Stable outbound attempt identifier. */
             id: string;
-            status: components["schemas"]["CallStatus"];
-            task: string;
-            recipient: components["schemas"]["CallRecipient"];
-            structured_result?: {
+            /** @description Phone number dialed by this attempt. */
+            phone: string;
+            /** @description Current attempt lifecycle state. */
+            status: components["schemas"]["AttemptStatus"];
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp when this attempt started dialing. `null` before dialing begins.
+             */
+            started_at: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp when this attempt reached a terminal state. `null` while queued, dialing, or in progress.
+             */
+            completed_at: string | null;
+            /** @description Human-readable summary for this attempt. `null` when no attempt-level summary is available. */
+            summary: string | null;
+            /** @description Structured transcript turns for this attempt. Empty when no transcript is available. */
+            transcript_turns: components["schemas"]["CallTranscriptTurn"][];
+            /** @description Provider call identifier for support correlation when available. */
+            provider_call_id: string | null;
+            /** @description Machine-readable failure reason when this attempt failed. */
+            failure_code: string | null;
+            /** @description Human-readable failure explanation when this attempt failed. */
+            failure_message: string | null;
+        };
+        CallTaskRecipient: {
+            /** @description Stable recipient identifier within the call task. */
+            id: string;
+            /** @description Phone numbers associated with this recipient. */
+            phones: string[];
+            /** @description BCP 47 locale hint used for this recipient when available. */
+            locale: string | null;
+            /** @description Country or region code used for routing and compliance checks when available. */
+            region: string | null;
+            /** @description Current recipient lifecycle state. */
+            status: components["schemas"]["RecipientStatus"];
+            /** @description Schema-valid structured result object extracted for this recipient. `null` when no usable structured result object was produced. */
+            structured_result: {
                 [key: string]: unknown;
             } | null;
-            result_validation?: components["schemas"]["ResultValidation"] | null;
-            summary?: string | null;
-            transcript?: string | null;
+            /** @description Short human-readable summary for this recipient. `null` while the recipient is still running or when no useful summary is available. */
+            summary: string | null;
+            /** @description Outbound dial attempts made for this recipient. */
+            attempts: components["schemas"]["CallTaskAttempt"][];
+        };
+        CallTask: {
+            /** @description Public CALL-E call task identifier. Store this id to fetch state, list events, and correlate webhooks. */
+            id: string;
+            /**
+             * @description Always `call_task` for call task responses.
+             * @enum {string}
+             */
+            object: "call_task";
+            /** @description Current call task lifecycle state. */
+            status: components["schemas"]["CallStatus"];
+            /** @description Original task instruction submitted when the call task was created. */
+            task: string;
+            /** @description Recipient states for this call task. */
+            recipients: components["schemas"]["CallTaskRecipient"][];
+            /** @description Schema-valid structured result object extracted for the whole call task. `null` when no usable structured result object was produced. */
+            structured_result: {
+                [key: string]: unknown;
+            } | null;
+            /** @description Short human-readable summary of the call task outcome. `null` while the call task is still running or when no useful summary is available. */
+            summary: string | null;
+            /** @description Post-summary judgment for whether the task reached a clear end state for the user. `null` until CALL-E has a terminal post-summary outcome. */
+            task_completed: boolean | null;
+            /** @description Confidence for `task_completed`. `null` until CALL-E has a terminal post-summary outcome. */
+            completion_confidence: components["schemas"]["CompletionConfidence"] | null;
+            /** @description Short evidence items supporting the post-summary task outcome. Empty until CALL-E has terminal evidence. */
+            evidence: string[];
+            /** @description Caller-owned metadata submitted on the create call request. */
             metadata: {
                 [key: string]: unknown;
             };
-            failure_code?: string | null;
-            failure_message?: string | null;
-            /** Format: date-time */
+            /** @description Machine-readable failure reason when `status` is `failed`; otherwise `null`. */
+            failure_code: string | null;
+            /** @description Human-readable failure explanation when `status` is `failed`; otherwise `null`. */
+            failure_message: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp when CALL-E accepted the call request.
+             */
             created_at: string;
-            /** Format: date-time */
-            completed_at?: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp when the call reached a terminal state. `null` while queued or in progress.
+             */
+            completed_at: string | null;
         };
         DeveloperEvent: {
+            /** @description Public event identifier. */
             id: string;
+            /** @description Developer-facing event type, for example `call.completed`. */
             type: string;
+            /** @description Public CALL-E call identifier associated with this event. */
             call_id: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp when the event was emitted.
+             */
             created_at: string;
-            /** @enum {string} */
+            /**
+             * @description Event severity for log routing and alerting.
+             * @enum {string}
+             */
             level: "debug" | "info" | "warning" | "error";
+            /** @description Call status at the time this event was emitted. */
             status: components["schemas"]["CallStatus"];
+            /** @description Short human-readable event message. */
             message: string;
+            /** @description Event-specific structured details. Shape depends on the event type. */
             details: {
                 [key: string]: unknown;
             };
         };
         EventList: {
-            /** @enum {string} */
+            /**
+             * @description Always `list` for paginated list responses.
+             * @enum {string}
+             */
             object: "list";
+            /** @description Events in this page, ordered from oldest to newest for the requested cursor window. */
             data: components["schemas"]["DeveloperEvent"][];
+            /** @description Cursor for the next page. `null` means there are no more events. */
             next_cursor?: string | null;
         };
-        /** @enum {string} */
+        /**
+         * @description Terminal webhook event type.
+         * @enum {string}
+         */
         WebhookEventType: "call.completed" | "call.failed" | "call.result_validation_failed";
+        /** @description Event payload CALL-E sends to your webhook receiver. */
         WebhookEvent: {
+            /** @description Unique webhook event id. Use it as an idempotency key when processing webhook side effects. */
             id: string;
+            /** @description Terminal event type for the call. */
             type: components["schemas"]["WebhookEventType"];
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp when CALL-E created this webhook event.
+             */
             created_at: string;
+            /** @description Terminal call task snapshot associated with the webhook event. */
             data: components["schemas"]["WebhookCallData"];
         };
-        WebhookCallData: {
-            /** @enum {string} */
-            object: "call";
-            id: string;
-            status: components["schemas"]["CallStatus"];
-            structured_result?: {
-                [key: string]: unknown;
-            } | null;
-            result_validation?: components["schemas"]["ResultValidation"] | null;
-            summary?: string | null;
-            metadata?: {
-                [key: string]: unknown;
-            };
-            failure_code?: string | null;
-            failure_message?: string | null;
+        /** @description Terminal call task state included in webhook events. This shape is the same stable `call_task` object returned by the calls API. */
+        WebhookCallData: components["schemas"]["CallTask"];
+        /** @description Example acknowledgement response from your webhook receiver. CALL-E treats any 2xx response as delivered and ignores the response body. */
+        WebhookAcknowledgement: {
+            /** @description Optional acknowledgement flag returned by your server. */
+            ok?: boolean;
+        } & {
+            [key: string]: unknown;
         };
         ErrorEnvelope: {
             error: components["schemas"]["APIError"];
         };
         APIError: {
             /** @enum {string} */
-            code: "invalid_request" | "unauthorized" | "forbidden" | "rate_limit_exceeded" | "insufficient_balance" | "unsupported_region" | "unsupported_language" | "recipient_blocked" | "policy_violation" | "call_not_ready" | "idempotency_conflict" | "provider_unavailable" | "internal_error" | "not_found";
+            code: "invalid_request" | "unauthorized" | "forbidden" | "rate_limit_exceeded" | "insufficient_balance" | "unsupported_region" | "unsupported_language" | "recipient_blocked" | "policy_violation" | "call_not_ready" | "no_recipients" | "invalid_recipient" | "invalid_phone" | "result_schema_invalid" | "recipient_result_schema_invalid" | "idempotency_conflict" | "provider_unavailable" | "internal_error" | "not_found";
             message: string;
             details: {
                 [key: string]: unknown;
@@ -193,8 +335,25 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. */
         IdempotencyKey: string;
+        /** @description Public CALL-E call identifier returned by create call. It starts with `call_` and is safe to store in your workflow records. */
         CallId: string;
+        /**
+         * @description Unique webhook event id. Store this value before side effects so duplicate deliveries can be ignored safely.
+         * @example evt_123
+         */
+        WebhookEventId: string;
+        /**
+         * @description Unix timestamp used in the signed payload. Verify this header together with `CALL-E-Signature` before parsing JSON.
+         * @example 1780309260
+         */
+        WebhookTimestamp: string;
+        /**
+         * @description HMAC SHA-256 signature in the form `v1=<hex digest>`, computed over `timestamp + "." + raw_body` with your webhook secret.
+         * @example v1=4d967f8f2b85f9c7d7f7ad1b9f8c5e3a5f1c2d3e4f5061728394050607080910
+         */
+        WebhookSignature: string;
     };
     requestBodies: never;
     headers: never;
@@ -206,6 +365,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path?: never;
@@ -217,19 +377,20 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Call accepted. */
-            200: {
+            /** @description Call task accepted. */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Call"];
+                    "application/json": components["schemas"]["CallTask"];
                 };
             };
             400: components["responses"]["ErrorResponse"];
             401: components["responses"]["ErrorResponse"];
             403: components["responses"]["ErrorResponse"];
             409: components["responses"]["ErrorResponse"];
+            422: components["responses"]["ErrorResponse"];
             429: components["responses"]["ErrorResponse"];
             500: components["responses"]["ErrorResponse"];
         };
@@ -239,6 +400,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description Public CALL-E call identifier returned by create call. It starts with `call_` and is safe to store in your workflow records. */
                 call_id: components["parameters"]["CallId"];
             };
             cookie?: never;
@@ -251,7 +413,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Call"];
+                    "application/json": components["schemas"]["CallTask"];
                 };
             };
             401: components["responses"]["ErrorResponse"];
@@ -264,11 +426,14 @@ export interface operations {
     listCallEvents: {
         parameters: {
             query?: {
+                /** @description Cursor returned by the previous event page. Omit it to start at the first available event page for the call. */
                 cursor?: string;
+                /** @description Maximum number of events to return in one page. */
                 limit?: number;
             };
             header?: never;
             path: {
+                /** @description Public CALL-E call identifier returned by create call. It starts with `call_` and is safe to store in your workflow records. */
                 call_id: components["parameters"]["CallId"];
             };
             cookie?: never;
@@ -289,6 +454,53 @@ export interface operations {
             404: components["responses"]["ErrorResponse"];
             429: components["responses"]["ErrorResponse"];
             500: components["responses"]["ErrorResponse"];
+        };
+    };
+    receiveWebhookEvent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Unique webhook event id. Store this value before side effects so duplicate deliveries can be ignored safely.
+                 * @example evt_123
+                 */
+                "CALL-E-Event-Id": components["parameters"]["WebhookEventId"];
+                /**
+                 * @description Unix timestamp used in the signed payload. Verify this header together with `CALL-E-Signature` before parsing JSON.
+                 * @example 1780309260
+                 */
+                "CALL-E-Timestamp": components["parameters"]["WebhookTimestamp"];
+                /**
+                 * @description HMAC SHA-256 signature in the form `v1=<hex digest>`, computed over `timestamp + "." + raw_body` with your webhook secret.
+                 * @example v1=4d967f8f2b85f9c7d7f7ad1b9f8c5e3a5f1c2d3e4f5061728394050607080910
+                 */
+                "CALL-E-Signature": components["parameters"]["WebhookSignature"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookEvent"];
+            };
+        };
+        responses: {
+            /** @description Webhook accepted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAcknowledgement"];
+                };
+            };
+            /** @description Webhook rejected because the payload or signature was invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
 }

@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: CALL-E Developer API
-  version: 0.1.0
-  description: Phase 1 Developer API contract used by the CALL-E TypeScript and Python SDKs.
+  version: 0.2.0
+  description: Developer API contract used by the CALL-E TypeScript and Python SDKs.
 servers:
   - url: https://api.heycall-e.com
     description: Placeholder developer API base URL.
@@ -25,15 +25,27 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateCallRequest"
             examples:
-              fridayLunch:
-                summary: US Friday lunch check.
+              batchLunch:
+                summary: Check Friday lunch availability for two recipients.
                 value:
-                  task: Call the recipient and ask whether they can attend Friday lunch in San Francisco.
-                  recipient:
-                    phone: "+14155550100"
-                    region: US
-                    locale: en-US
+                  task: Call each recipient and ask whether they can attend Friday lunch in San Francisco.
+                  recipients:
+                    - phones:
+                        - "<RECIPIENT_1_E164_PHONE>"
+                      region: US
+                      locale: en-US
+                    - phones:
+                        - "<RECIPIENT_2_E164_PHONE>"
+                      region: US
+                      locale: en-US
                   result_schema:
+                    type: object
+                    required:
+                      - completed_count
+                    properties:
+                      completed_count:
+                        type: integer
+                  recipient_result_schema:
                     type: object
                     required:
                       - can_attend
@@ -44,34 +56,64 @@ paths:
                           - "yes"
                           - "no"
                           - unknown
-                    additionalProperties: false
                   metadata:
                     workflow_run_id: wf_123
                   webhook_url: https://example.com/calle/webhook
+              taskOnly:
+                summary: Let CALL-E infer recipients from the task.
+                value:
+                  task: Call <E164_PHONE> and ask whether they can attend Friday lunch in San Francisco.
       responses:
-        "200":
-          description: Call accepted.
+        "201":
+          description: Call task accepted.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Call"
+                $ref: "#/components/schemas/CallTask"
               examples:
                 completedFridayLunch:
                   summary: Completed US Friday lunch check.
                   value:
                     id: call_123
+                    object: "call_task"
                     status: completed
-                    task: Call the recipient and ask whether they can attend Friday lunch in San Francisco.
-                    recipient:
-                      phone: "+14155550100"
-                      region: US
-                      locale: en-US
+                    task: Call each recipient and ask whether they can attend Friday lunch in San Francisco.
+                    recipients:
+                      - id: rcp_123
+                        phones:
+                          - "<RECIPIENT_1_E164_PHONE>"
+                        locale: en-US
+                        region: US
+                        status: completed
+                        structured_result:
+                          can_attend: "yes"
+                        summary: The recipient can attend Friday lunch.
+                        attempts:
+                          - id: att_123
+                            phone: "<RECIPIENT_1_E164_PHONE>"
+                            status: completed
+                            started_at: "2026-06-01T17:00:05Z"
+                            completed_at: "2026-06-01T17:01:00Z"
+                            summary: The recipient can attend Friday lunch.
+                            transcript_turns:
+                              - offset_seconds: 0
+                                speaker: bot
+                                text: Can you attend Friday lunch in San Francisco?
+                              - offset_seconds: 8
+                                speaker: user
+                                text: Yes, I can attend.
+                            provider_call_id: provider_call_123
+                            failure_code: null
+                            failure_message: null
                     structured_result:
-                      can_attend: "yes"
-                    result_validation:
-                      valid: true
+                      completed_count: 1
                     summary: The recipient can attend Friday lunch.
-                    transcript: null
+                    task_completed: true
+                    completion_confidence:
+                      score: 0.92
+                      label: high
+                    evidence:
+                      - The recipient said yes.
                     metadata:
                       workflow_run_id: wf_123
                     failure_code: null
@@ -85,6 +127,8 @@ paths:
         "403":
           $ref: "#/components/responses/ErrorResponse"
         "409":
+          $ref: "#/components/responses/ErrorResponse"
+        "422":
           $ref: "#/components/responses/ErrorResponse"
         "429":
           $ref: "#/components/responses/ErrorResponse"
@@ -105,24 +149,51 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Call"
+                $ref: "#/components/schemas/CallTask"
               examples:
                 completedFridayLunch:
                   summary: Completed US Friday lunch check.
                   value:
                     id: call_123
+                    object: "call_task"
                     status: completed
-                    task: Call the recipient and ask whether they can attend Friday lunch in San Francisco.
-                    recipient:
-                      phone: "+14155550100"
-                      region: US
-                      locale: en-US
+                    task: Call each recipient and ask whether they can attend Friday lunch in San Francisco.
+                    recipients:
+                      - id: rcp_123
+                        phones:
+                          - "<RECIPIENT_1_E164_PHONE>"
+                        locale: en-US
+                        region: US
+                        status: completed
+                        structured_result:
+                          can_attend: "yes"
+                        summary: The recipient can attend Friday lunch.
+                        attempts:
+                          - id: att_123
+                            phone: "<RECIPIENT_1_E164_PHONE>"
+                            status: completed
+                            started_at: "2026-06-01T17:00:05Z"
+                            completed_at: "2026-06-01T17:01:00Z"
+                            summary: The recipient can attend Friday lunch.
+                            transcript_turns:
+                              - offset_seconds: 0
+                                speaker: bot
+                                text: Can you attend Friday lunch in San Francisco?
+                              - offset_seconds: 8
+                                speaker: user
+                                text: Yes, I can attend.
+                            provider_call_id: provider_call_123
+                            failure_code: null
+                            failure_message: null
                     structured_result:
-                      can_attend: "yes"
-                    result_validation:
-                      valid: true
+                      completed_count: 1
                     summary: The recipient can attend Friday lunch.
-                    transcript: null
+                    task_completed: true
+                    completion_confidence:
+                      score: 0.92
+                      label: high
+                    evidence:
+                      - The recipient said yes.
                     metadata:
                       workflow_run_id: wf_123
                     failure_code: null
@@ -230,16 +301,52 @@ paths:
                   type: call.completed
                   created_at: "2026-06-01T17:01:00Z"
                   data:
-                    object: call
+                    object: "call_task"
                     id: call_123
                     status: completed
+                    task: Call each recipient and ask whether they can attend Friday lunch in San Francisco.
+                    recipients:
+                      - id: rcp_123
+                        phones:
+                          - "<RECIPIENT_1_E164_PHONE>"
+                        locale: en-US
+                        region: US
+                        status: completed
+                        structured_result:
+                          can_attend: "yes"
+                        summary: The recipient can attend Friday lunch.
+                        attempts:
+                          - id: att_123
+                            phone: "<RECIPIENT_1_E164_PHONE>"
+                            status: completed
+                            started_at: "2026-06-01T17:00:05Z"
+                            completed_at: "2026-06-01T17:01:00Z"
+                            summary: The recipient can attend Friday lunch.
+                            transcript_turns:
+                              - offset_seconds: 0
+                                speaker: bot
+                                text: Can you attend Friday lunch in San Francisco?
+                              - offset_seconds: 8
+                                speaker: user
+                                text: Yes, I can attend.
+                            provider_call_id: provider_call_123
+                            failure_code: null
+                            failure_message: null
                     structured_result:
-                      can_attend: "yes"
-                    result_validation:
-                      valid: true
+                      completed_count: 1
                     summary: The recipient can attend Friday lunch.
+                    task_completed: true
+                    completion_confidence:
+                      score: 0.92
+                      label: high
+                    evidence:
+                      - The recipient said yes.
                     metadata:
                       workflow_run_id: wf_123
+                    failure_code: null
+                    failure_message: null
+                    created_at: "2026-06-01T17:00:00Z"
+                    completed_at: "2026-06-01T17:01:00Z"
       responses:
         "200":
           description: Webhook accepted.
@@ -252,6 +359,8 @@ paths:
                   summary: Acknowledge the webhook.
                   value:
                     ok: true
+        "400":
+          description: Webhook rejected because the payload or signature was invalid.
 components:
   securitySchemes:
     bearerAuth:
@@ -313,27 +422,31 @@ components:
       additionalProperties: false
       required:
         - task
-        - recipient
-        - result_schema
       properties:
         task:
           type: string
-          description: Natural-language instruction for the call. Include the goal, context the voice agent should know, and the exact information you want collected.
+          description: Natural-language instruction for the call task. Include the goal, relevant details the voice agent should know, and the exact information you want collected.
           minLength: 1
-        recipient:
-          description: Person or phone endpoint CALL-E should dial.
-          $ref: "#/components/schemas/CallRecipient"
-        context:
-          type: object
-          description: Optional structured context for your own workflow. CALL-E stores and returns it only when relevant to orchestration; do not put secrets here.
-          additionalProperties: true
+        recipients:
+          type:
+            - array
+            - "null"
+          description: Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use.
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CallTaskRecipientRequest"
         result_schema:
-          type: object
-          description: JSON Schema object that defines the structured result CALL-E should extract from the call. The terminal call result is validated against this schema.
+          type:
+            - object
+            - "null"
+          description: Optional JSON Schema object that defines the structured result CALL-E should extract for the whole call task. Object schemas are strict by default; fields not declared in `properties` are rejected.
           additionalProperties: true
-        policy:
-          description: Optional Phase 1 call behavior policy. Phase 1 is intentionally conservative and supports one outbound attempt.
-          $ref: "#/components/schemas/CallPolicy"
+        recipient_result_schema:
+          type:
+            - object
+            - "null"
+          description: Optional JSON Schema object that defines the structured result CALL-E should extract for each recipient. Object schemas are strict by default; fields not declared in `properties` are rejected.
+          additionalProperties: true
         metadata:
           type: object
           description: Optional caller-owned metadata echoed on the call and webhook payloads. Use this for workflow ids, tenant ids, or internal correlation keys.
@@ -342,44 +455,29 @@ components:
           type: string
           description: Optional per-request HTTPS webhook URL. When provided, CALL-E sends terminal call events to this URL in addition to project-level webhook delivery.
           format: uri
-    CallRecipient:
+    CallTaskRecipientRequest:
       type: object
       additionalProperties: false
+      required:
+        - phones
       properties:
-        phone:
-          type: string
-          description: Recipient phone number in E.164 format, for example `+14155550100`.
-        name:
-          type: string
-          description: Optional display name for the recipient. Use it when the call script should address the person by name.
+        phones:
+          type: array
+          description: Phone numbers in E.164 format for this recipient. Replace placeholders such as `<RECIPIENT_1_E164_PHONE>` with phone numbers you own or are authorized to call.
+          minItems: 1
+          items:
+            type: string
+            pattern: "^\\+[1-9]\\d{6,14}$"
         locale:
-          type: string
+          type:
+            - string
+            - "null"
           description: BCP 47 locale hint for the conversation, for example `en-US`.
         region:
-          type: string
+          type:
+            - string
+            - "null"
           description: Recipient country or region code used for routing and compliance checks, for example `US`.
-    CallPolicy:
-      type: object
-      additionalProperties: false
-      properties:
-        max_attempts:
-          type: integer
-          description: Maximum outbound dial attempts. Phase 1 supports exactly one attempt.
-          minimum: 1
-          maximum: 1
-          default: 1
-        voicemail:
-          type: string
-          description: Voicemail policy. Phase 1 does not leave voicemail messages.
-          enum:
-            - do_not_leave
-          default: do_not_leave
-        on_not_ready:
-          type: string
-          description: Behavior when the call cannot start because the recipient, region, or provider state is not ready. Phase 1 returns an error instead of silently retrying.
-          enum:
-            - error
-          default: error
     CallStatus:
       type: string
       description: Current lifecycle state of a CALL-E call.
@@ -389,65 +487,243 @@ components:
         - completed
         - failed
         - canceled
-    ResultValidation:
+    CompletionConfidence:
       type: object
       additionalProperties: false
       required:
-        - valid
+        - score
+        - label
       properties:
-        valid:
-          type: boolean
-          description: Whether `structured_result` matched the submitted `result_schema`.
-        error_code:
+        score:
+          type: number
+          description: Confidence score in the 0 to 1 range for CALL-E's task completion judgment.
+          minimum: 0
+          maximum: 1
+        label:
           type: string
-          description: Machine-readable validation failure code when the structured result did not match the schema.
-        message:
+          description: Confidence label for the task completion judgment, for example `low`, `medium`, or `high`.
+    RecipientStatus:
+      type: string
+      description: Current lifecycle state for one recipient in a call task.
+      enum:
+        - pending
+        - in_progress
+        - completed
+        - failed
+        - skipped
+    AttemptStatus:
+      type: string
+      description: Current lifecycle state for one outbound dial attempt.
+      enum:
+        - queued
+        - dialing
+        - in_progress
+        - completed
+        - failed
+        - canceled
+    TranscriptSpeaker:
+      type: string
+      description: Speaker label for one transcript turn.
+      enum:
+        - bot
+        - user
+        - unknown
+    CallTranscriptTurn:
+      type: object
+      additionalProperties: false
+      required:
+        - offset_seconds
+        - speaker
+        - text
+      properties:
+        offset_seconds:
+          type:
+            - integer
+            - "null"
+          description: Seconds from the start of the attempt. `null` when the source line did not include a parseable timestamp.
+          minimum: 0
+        speaker:
+          description: Speaker for this transcript turn.
+          $ref: "#/components/schemas/TranscriptSpeaker"
+        text:
           type: string
-          description: Human-readable validation message suitable for logs and dashboards.
-    Call:
+          description: Spoken text for this transcript turn.
+    CallTaskAttempt:
       type: object
       additionalProperties: false
       required:
         - id
+        - phone
         - status
-        - task
-        - recipient
-        - metadata
-        - created_at
+        - started_at
+        - completed_at
+        - summary
+        - transcript_turns
+        - provider_call_id
+        - failure_code
+        - failure_message
       properties:
         id:
           type: string
-          description: Public CALL-E call identifier. Store this id to fetch call state, list events, and correlate webhooks.
-        status:
-          description: Current call lifecycle state.
-          $ref: "#/components/schemas/CallStatus"
-        task:
+          description: Stable outbound attempt identifier.
+        phone:
           type: string
-          description: Original task instruction submitted when the call was created.
-        recipient:
-          description: Recipient details used for the call.
-          $ref: "#/components/schemas/CallRecipient"
-        structured_result:
+          description: Phone number dialed by this attempt.
+        status:
+          description: Current attempt lifecycle state.
+          $ref: "#/components/schemas/AttemptStatus"
+        started_at:
           type:
-            - object
+            - string
             - "null"
-          description: Structured result extracted from the call. Present on successful terminal calls when CALL-E can produce data matching `result_schema`; otherwise `null`.
-          additionalProperties: true
-        result_validation:
-          description: Validation outcome for `structured_result` against the submitted `result_schema`. `null` until a result has been produced.
-          oneOf:
-            - $ref: "#/components/schemas/ResultValidation"
-            - type: "null"
+          description: ISO 8601 timestamp when this attempt started dialing. `null` before dialing begins.
+          format: date-time
+        completed_at:
+          type:
+            - string
+            - "null"
+          description: ISO 8601 timestamp when this attempt reached a terminal state. `null` while queued, dialing, or in progress.
+          format: date-time
         summary:
           type:
             - string
             - "null"
-          description: Short human-readable summary of the conversation outcome. `null` while the call is still running or when no useful summary is available.
-        transcript:
+          description: Human-readable summary for this attempt. `null` when no attempt-level summary is available.
+        transcript_turns:
+          type: array
+          description: Structured transcript turns for this attempt. Empty when no transcript is available.
+          items:
+            $ref: "#/components/schemas/CallTranscriptTurn"
+        provider_call_id:
           type:
             - string
             - "null"
-          description: Transcript text when available. Phase 1 may return `null` if transcript capture is not enabled or not yet ready.
+          description: Provider call identifier for support correlation when available.
+        failure_code:
+          type:
+            - string
+            - "null"
+          description: Machine-readable failure reason when this attempt failed.
+        failure_message:
+          type:
+            - string
+            - "null"
+          description: Human-readable failure explanation when this attempt failed.
+    CallTaskRecipient:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - phones
+        - locale
+        - region
+        - status
+        - structured_result
+        - summary
+        - attempts
+      properties:
+        id:
+          type: string
+          description: Stable recipient identifier within the call task.
+        phones:
+          type: array
+          description: Phone numbers associated with this recipient.
+          items:
+            type: string
+        locale:
+          type:
+            - string
+            - "null"
+          description: BCP 47 locale hint used for this recipient when available.
+        region:
+          type:
+            - string
+            - "null"
+          description: Country or region code used for routing and compliance checks when available.
+        status:
+          description: Current recipient lifecycle state.
+          $ref: "#/components/schemas/RecipientStatus"
+        structured_result:
+          type:
+            - object
+            - "null"
+          description: Schema-valid structured result object extracted for this recipient. `null` when no usable structured result object was produced.
+          additionalProperties: true
+        summary:
+          type:
+            - string
+            - "null"
+          description: Short human-readable summary for this recipient. `null` while the recipient is still running or when no useful summary is available.
+        attempts:
+          type: array
+          description: Outbound dial attempts made for this recipient.
+          items:
+            $ref: "#/components/schemas/CallTaskAttempt"
+    CallTask:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - object
+        - status
+        - task
+        - recipients
+        - structured_result
+        - summary
+        - task_completed
+        - completion_confidence
+        - evidence
+        - metadata
+        - failure_code
+        - failure_message
+        - created_at
+        - completed_at
+      properties:
+        id:
+          type: string
+          description: Public CALL-E call task identifier. Store this id to fetch state, list events, and correlate webhooks.
+        object:
+          type: string
+          description: Always `call_task` for call task responses.
+          enum:
+            - call_task
+        status:
+          description: Current call task lifecycle state.
+          $ref: "#/components/schemas/CallStatus"
+        task:
+          type: string
+          description: Original task instruction submitted when the call task was created.
+        recipients:
+          type: array
+          description: Recipient states for this call task.
+          items:
+            $ref: "#/components/schemas/CallTaskRecipient"
+        structured_result:
+          type:
+            - object
+            - "null"
+          description: Schema-valid structured result object extracted for the whole call task. `null` when no usable structured result object was produced.
+          additionalProperties: true
+        summary:
+          type:
+            - string
+            - "null"
+          description: Short human-readable summary of the call task outcome. `null` while the call task is still running or when no useful summary is available.
+        task_completed:
+          type:
+            - boolean
+            - "null"
+          description: Post-summary judgment for whether the task reached a clear end state for the user. `null` until CALL-E has a terminal post-summary outcome.
+        completion_confidence:
+          oneOf:
+            - $ref: "#/components/schemas/CompletionConfidence"
+            - type: "null"
+          description: Confidence for `task_completed`. `null` until CALL-E has a terminal post-summary outcome.
+        evidence:
+          type: array
+          description: Short evidence items supporting the post-summary task outcome. Empty until CALL-E has terminal evidence.
+          items:
+            type: string
         metadata:
           type: object
           description: Caller-owned metadata submitted on the create call request.
@@ -566,58 +842,12 @@ components:
           description: ISO 8601 timestamp when CALL-E created this webhook event.
           format: date-time
         data:
-          description: Terminal call snapshot associated with the webhook event.
+          description: Terminal call task snapshot associated with the webhook event.
           $ref: "#/components/schemas/WebhookCallData"
     WebhookCallData:
-      type: object
-      description: Terminal call state included in webhook events.
-      additionalProperties: false
-      required:
-        - object
-        - id
-        - status
-      properties:
-        object:
-          type: string
-          description: Always `call` for terminal call webhook events.
-          enum:
-            - call
-        id:
-          type: string
-          description: Public CALL-E call identifier associated with the webhook.
-        status:
-          description: Terminal or current call lifecycle state.
-          $ref: "#/components/schemas/CallStatus"
-        structured_result:
-          type:
-            - object
-            - "null"
-          description: Structured result extracted from the call. Present for successful terminal calls when available.
-          additionalProperties: true
-        result_validation:
-          description: Validation result for `structured_result` against the submitted `result_schema`.
-          oneOf:
-            - $ref: "#/components/schemas/ResultValidation"
-            - type: "null"
-        summary:
-          type:
-            - string
-            - "null"
-          description: Human-readable summary of the conversation outcome.
-        metadata:
-          type: object
-          description: Caller-owned metadata copied from the create call request.
-          additionalProperties: true
-        failure_code:
-          type:
-            - string
-            - "null"
-          description: Machine-readable failure reason when the call failed.
-        failure_message:
-          type:
-            - string
-            - "null"
-          description: Human-readable failure explanation when the call failed.
+      description: Terminal call task state included in webhook events. This shape is the same stable `call_task` object returned by the calls API.
+      allOf:
+        - $ref: "#/components/schemas/CallTask"
     WebhookAcknowledgement:
       type: object
       description: Example acknowledgement response from your webhook receiver. CALL-E treats any 2xx response as delivered and ignores the response body.
@@ -655,6 +885,11 @@ components:
             - recipient_blocked
             - policy_violation
             - call_not_ready
+            - no_recipients
+            - invalid_recipient
+            - invalid_phone
+            - result_schema_invalid
+            - recipient_result_schema_invalid
             - idempotency_conflict
             - provider_unavailable
             - internal_error

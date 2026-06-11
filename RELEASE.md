@@ -10,10 +10,10 @@ The first beta is published to npm:
 @call-e/calle@0.1.0-beta.1
 ```
 
-The first stable release version is:
+The current stable release version is:
 
 ```text
-@call-e/calle@0.1.0
+@call-e/calle@0.2.0
 ```
 
 Release publishing requires one of these release identities:
@@ -34,7 +34,7 @@ The CI workflow runs the same package checks on `main`.
 
 ## Stable npm publish
 
-1. Confirm `package.json` has a unique stable version. The first stable version is `0.1.0`.
+1. Confirm `package.json` has a unique stable version.
 2. Confirm GitHub Actions secret `NPM_TOKEN` is configured, unless the package has been moved to npm Trusted Publishing.
 3. Open the `Publish npm package` workflow in GitHub Actions.
 4. Run the workflow from `main` with tag `latest` and the selected release identity.
@@ -48,7 +48,7 @@ npm view @call-e/calle dist-tags version
 tmpdir="$(mktemp -d)"
 cd "$tmpdir"
 npm init -y
-npm install @call-e/calle@0.1.0
+npm install @call-e/calle@0.2.0
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
@@ -56,10 +56,10 @@ node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; consol
 
 The stable package should be available through the `latest` dist-tag.
 
-If `latest` still points to `0.1.0-beta.1` after the stable publish, correct it only after confirming `0.1.0` is visible:
+If `latest` still points to an older version after the stable publish, correct it only after confirming `0.2.0` is visible:
 
 ```bash
-npm dist-tag add @call-e/calle@0.1.0 latest
+npm dist-tag add @call-e/calle@0.2.0 latest
 npm dist-tag ls @call-e/calle
 ```
 

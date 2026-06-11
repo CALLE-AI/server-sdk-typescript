@@ -10,13 +10,39 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
 
 const completedCall = {
   id: "call_123",
+  object: "call_task",
   status: "completed",
   task: "Call.",
-  recipient: { phone: "+14155550100", region: "US", locale: "en-US" },
-  structured_result: { can_attend: "yes" },
-  result_validation: { valid: true },
+  recipients: [
+    {
+      id: "rcp_123",
+      phones: ["+14155550100"],
+      region: "US",
+      locale: "en-US",
+      status: "completed",
+      structured_result: { can_attend: "yes" },
+      summary: "Recipient can attend.",
+      attempts: [
+        {
+          id: "att_123",
+          phone: "+14155550100",
+          status: "completed",
+          started_at: "2026-05-31T00:00:10Z",
+          completed_at: "2026-05-31T00:01:00Z",
+          summary: "Recipient can attend.",
+          transcript_turns: [{ offset_seconds: 2, speaker: "user", text: "Yes." }],
+          provider_call_id: "provider_123",
+          failure_code: null,
+          failure_message: null
+        }
+      ]
+    }
+  ],
+  structured_result: { completed_count: 1 },
   summary: "Done.",
-  transcript: null,
+  task_completed: true,
+  completion_confidence: { score: 0.92, label: "high" },
+  evidence: ["The recipient said yes."],
   metadata: { workflow_run_id: "wf_123" },
   failure_code: null,
   failure_message: null,
@@ -40,7 +66,7 @@ describe("CalleClient calls", () => {
     });
   });
 
-  it("creates calls with auth and idempotency headers", async () => {
+  it("creates calls with auth, idempotency headers, and structured result schemas", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       expect(request.method).toBe("POST");
@@ -48,7 +74,9 @@ describe("CalleClient calls", () => {
       expect(request.headers.get("idempotency-key")).toBe("wf_123");
       expect(await request.json()).toMatchObject({
         task: "Call.",
-        result_schema: { type: "object", properties: {} },
+        recipients: [{ phones: ["+14155550100"], region: "US", locale: "en-US" }],
+        result_schema: { type: "object", properties: { completed_count: { type: "integer" } } },
+        recipient_result_schema: { type: "object", properties: { can_attend: { type: "string" } } },
         webhook_url: "https://example.com/webhook"
       });
       return jsonResponse(completedCall);
@@ -59,14 +87,34 @@ describe("CalleClient calls", () => {
       {
         task: "Call.",
         recipient: { phone: "+14155550100", region: "US", locale: "en-US" },
-        resultSchema: { type: "object", properties: {} },
+        resultSchema: { type: "object", properties: { completed_count: { type: "integer" } } },
+        recipientResultSchema: { type: "object", properties: { can_attend: { type: "string" } } },
         webhookUrl: "https://example.com/webhook"
       },
       { idempotencyKey: "wf_123" }
     );
 
     expect(call.id).toBe("call_123");
-    expect(call.structuredResult).toEqual({ can_attend: "yes" });
+    expect(call.structuredResult).toEqual({ completed_count: 1 });
+    expect(call.taskCompleted).toBe(true);
+    expect(call.completionConfidence).toEqual({ score: 0.92, label: "high" });
+    expect(call.evidence).toEqual(["The recipient said yes."]);
+    expect(call.recipients[0]?.structuredResult).toEqual({ can_attend: "yes" });
+    expect(call.recipients[0]?.attempts[0]?.transcriptTurns).toEqual([{ offset_seconds: 2, speaker: "user", text: "Yes." }]);
+    expect("resultValidation" in call).toBe(false);
+  });
+
+  it("creates task-only calls without explicit recipients or schemas", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      expect(await request.json()).toEqual({ task: "Call +14155550100." });
+      return jsonResponse(completedCall);
+    });
+    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
+
+    const call = await client.calls.create({ task: "Call +14155550100." });
+
+    expect(call.status).toBe("completed");
   });
 
   it("maps API errors into CalleAPIError", async () => {

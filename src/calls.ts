@@ -2,7 +2,7 @@ import createClient, { type Client } from "openapi-fetch";
 import type { components, paths } from "./generated/schema.js";
 import { CalleConnectionError, CalleTimeoutError, apiErrorFromResponse } from "./errors.js";
 
-type ApiCall = components["schemas"]["Call"];
+type ApiCall = components["schemas"]["CallTask"];
 type ApiCreateCallRequest = components["schemas"]["CreateCallRequest"];
 type ApiEventList = components["schemas"]["EventList"];
 type FetchLike = (input: Request) => Promise<Response>;
@@ -10,23 +10,45 @@ type FetchLike = (input: Request) => Promise<Response>;
 export type JsonObject = Record<string, unknown>;
 export type CallStatus = ApiCall["status"];
 
-export interface CallRecipient {
+export interface CallRecipientInput {
+  phones?: string[];
   phone?: string;
-  name?: string;
   locale?: string;
   region?: string;
 }
 
+export type CallTranscriptTurn = components["schemas"]["CallTranscriptTurn"];
+
+export interface CallAttempt {
+  id: string;
+  phone: string;
+  status: components["schemas"]["AttemptStatus"];
+  startedAt: string | null;
+  completedAt: string | null;
+  summary: string | null;
+  transcriptTurns: CallTranscriptTurn[];
+  providerCallId: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+}
+
+export interface CallRecipient {
+  id: string;
+  phones: string[];
+  locale: string | null;
+  region: string | null;
+  status: components["schemas"]["RecipientStatus"];
+  structuredResult: JsonObject | null;
+  summary: string | null;
+  attempts: CallAttempt[];
+}
+
 export interface CreateCallInput {
   task: string;
-  recipient: CallRecipient;
-  context?: JsonObject;
-  resultSchema: JsonObject;
-  policy?: {
-    maxAttempts?: number;
-    voicemail?: "do_not_leave";
-    onNotReady?: "error";
-  };
+  recipient?: CallRecipientInput;
+  recipients?: CallRecipientInput[];
+  resultSchema?: JsonObject | null;
+  recipientResultSchema?: JsonObject | null;
   metadata?: JsonObject;
   webhookUrl?: string;
 }
@@ -47,13 +69,15 @@ export interface ListEventsOptions {
 
 export interface Call {
   id: string;
+  object: "call_task";
   status: CallStatus;
   task: string;
-  recipient: CallRecipient;
+  recipients: CallRecipient[];
   structuredResult: JsonObject | null;
-  resultValidation: ApiCall["result_validation"];
   summary: string | null;
-  transcript: string | null;
+  taskCompleted: boolean | null;
+  completionConfidence: components["schemas"]["CompletionConfidence"] | null;
+  evidence: string[];
   metadata: JsonObject;
   failureCode: string | null;
   failureMessage: string | null;
@@ -67,27 +91,36 @@ export interface EventList {
   nextCursor: string | null;
 }
 
+function toApiRecipient(input: CallRecipientInput): components["schemas"]["CallTaskRecipientRequest"] {
+  const phones = input.phones ?? (input.phone !== undefined ? [input.phone] : []);
+  const recipient: components["schemas"]["CallTaskRecipientRequest"] = { phones };
+  if (input.locale !== undefined) {
+    recipient.locale = input.locale;
+  }
+  if (input.region !== undefined) {
+    recipient.region = input.region;
+  }
+  return recipient;
+}
+
 function toApiCreateCall(input: CreateCallInput): ApiCreateCallRequest {
   const body: Record<string, unknown> = {
-    task: input.task,
-    recipient: input.recipient,
-    result_schema: input.resultSchema
+    task: input.task
   };
-  if (input.context !== undefined) {
-    body.context = input.context;
+  if (input.recipient !== undefined && input.recipients !== undefined) {
+    throw new Error("Pass either recipient or recipients, not both.");
   }
-  if (input.policy !== undefined) {
-    const policy: Record<string, unknown> = {};
-    if (input.policy.maxAttempts !== undefined) {
-      policy.max_attempts = input.policy.maxAttempts;
-    }
-    if (input.policy.voicemail !== undefined) {
-      policy.voicemail = input.policy.voicemail;
-    }
-    if (input.policy.onNotReady !== undefined) {
-      policy.on_not_ready = input.policy.onNotReady;
-    }
-    body.policy = policy;
+  if (input.recipient !== undefined) {
+    body.recipients = [toApiRecipient(input.recipient)];
+  }
+  if (input.recipients !== undefined) {
+    body.recipients = input.recipients.map(toApiRecipient);
+  }
+  if (input.resultSchema !== undefined) {
+    body.result_schema = input.resultSchema;
+  }
+  if (input.recipientResultSchema !== undefined) {
+    body.recipient_result_schema = input.recipientResultSchema;
   }
   if (input.metadata !== undefined) {
     body.metadata = input.metadata;
@@ -98,16 +131,46 @@ function toApiCreateCall(input: CreateCallInput): ApiCreateCallRequest {
   return body as ApiCreateCallRequest;
 }
 
+function fromApiAttempt(attempt: components["schemas"]["CallTaskAttempt"]): CallAttempt {
+  return {
+    id: attempt.id,
+    phone: attempt.phone,
+    status: attempt.status,
+    startedAt: attempt.started_at,
+    completedAt: attempt.completed_at,
+    summary: attempt.summary ?? null,
+    transcriptTurns: attempt.transcript_turns ?? [],
+    providerCallId: attempt.provider_call_id ?? null,
+    failureCode: attempt.failure_code ?? null,
+    failureMessage: attempt.failure_message ?? null
+  };
+}
+
+function fromApiRecipient(recipient: components["schemas"]["CallTaskRecipient"]): CallRecipient {
+  return {
+    id: recipient.id,
+    phones: recipient.phones,
+    locale: recipient.locale ?? null,
+    region: recipient.region ?? null,
+    status: recipient.status,
+    structuredResult: recipient.structured_result ?? null,
+    summary: recipient.summary ?? null,
+    attempts: recipient.attempts.map(fromApiAttempt)
+  };
+}
+
 function fromApiCall(call: ApiCall): Call {
   return {
     id: call.id,
+    object: call.object,
     status: call.status,
     task: call.task,
-    recipient: call.recipient,
+    recipients: call.recipients.map(fromApiRecipient),
     structuredResult: call.structured_result ?? null,
-    resultValidation: call.result_validation ?? null,
     summary: call.summary ?? null,
-    transcript: call.transcript ?? null,
+    taskCompleted: call.task_completed ?? null,
+    completionConfidence: call.completion_confidence ?? null,
+    evidence: call.evidence ?? [],
     metadata: call.metadata ?? {},
     failureCode: call.failure_code ?? null,
     failureMessage: call.failure_message ?? null,

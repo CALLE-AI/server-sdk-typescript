@@ -7,19 +7,27 @@ const client = new CalleClient({
 
 const call = await client.calls.createAndWait(
   {
-    task: "Call the recipient and ask whether they can attend Friday lunch in San Francisco.",
-    recipient: {
-      phone: process.env.CALLE_EXAMPLE_PHONE ?? "+14155550100",
-      region: "US",
-      locale: "en-US"
-    },
+    task: "Call each recipient and ask whether they can attend Friday lunch in San Francisco.",
+    recipients: [
+      {
+        phones: [process.env.CALLE_EXAMPLE_PHONE ?? "+14155550100"],
+        region: "US",
+        locale: "en-US"
+      }
+    ],
     resultSchema: {
+      type: "object",
+      required: ["completed_count"],
+      properties: {
+        completed_count: { type: "integer" }
+      }
+    },
+    recipientResultSchema: {
       type: "object",
       required: ["can_attend"],
       properties: {
         can_attend: { type: "string", enum: ["yes", "no", "unknown"] }
-      },
-      additionalProperties: false
+      }
     },
     metadata: {
       workflow_run_id: "example_local"

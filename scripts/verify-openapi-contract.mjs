@@ -11,8 +11,8 @@ function assertContract(condition, message) {
   }
 }
 
-function responseSchemaRef(path, method) {
-  return spec.paths?.[path]?.[method]?.responses?.["200"]?.content?.[
+function responseSchemaRef(path, method, status = "200") {
+  return spec.paths?.[path]?.[method]?.responses?.[status]?.content?.[
     "application/json"
   ]?.schema?.$ref;
 }
@@ -31,7 +31,7 @@ function parameterRefs(path, method) {
 
 assertContract(spec.openapi === "3.1.0", "expected OpenAPI 3.1.0");
 assertContract(spec.info?.title === "CALL-E Developer API", "unexpected title");
-assertContract(spec.info?.version === "0.1.0", "unexpected API version");
+assertContract(spec.info?.version === "0.2.0", "unexpected API version");
 
 const requiredOperations = [
   {
@@ -39,14 +39,15 @@ const requiredOperations = [
     method: "post",
     operationId: "createCall",
     requestSchema: "#/components/schemas/CreateCallRequest",
-    responseSchema: "#/components/schemas/Call",
-    errorStatuses: ["400", "401", "403", "409", "429", "500"],
+    responseStatus: "201",
+    responseSchema: "#/components/schemas/CallTask",
+    errorStatuses: ["400", "401", "403", "409", "422", "429", "500"],
   },
   {
     path: "/v1/calls/{call_id}",
     method: "get",
     operationId: "getCall",
-    responseSchema: "#/components/schemas/Call",
+    responseSchema: "#/components/schemas/CallTask",
     errorStatuses: ["401", "403", "404", "429", "500"],
   },
   {
@@ -74,8 +75,8 @@ for (const operation of requiredOperations) {
     `unexpected operationId for ${operation.method.toUpperCase()} ${operation.path}`,
   );
   assertContract(
-    responseSchemaRef(operation.path, operation.method) === operation.responseSchema,
-    `unexpected 200 response schema for ${operation.method.toUpperCase()} ${operation.path}`,
+    responseSchemaRef(operation.path, operation.method, operation.responseStatus) === operation.responseSchema,
+    `unexpected ${operation.responseStatus ?? "200"} response schema for ${operation.method.toUpperCase()} ${operation.path}`,
   );
 
   if (operation.requestSchema) {
@@ -109,11 +110,16 @@ assertContract(
 const schemas = spec.components?.schemas ?? {};
 for (const schemaName of [
   "CreateCallRequest",
-  "CallRecipient",
-  "CallPolicy",
+  "CallTaskRecipientRequest",
   "CallStatus",
-  "ResultValidation",
-  "Call",
+  "CompletionConfidence",
+  "RecipientStatus",
+  "AttemptStatus",
+  "TranscriptSpeaker",
+  "CallTranscriptTurn",
+  "CallTaskAttempt",
+  "CallTaskRecipient",
+  "CallTask",
   "DeveloperEvent",
   "EventList",
   "WebhookEventType",
@@ -129,9 +135,9 @@ for (const schemaName of [
 const createCallProperties = schemas.CreateCallRequest?.properties ?? {};
 for (const property of [
   "task",
-  "recipient",
+  "recipients",
   "result_schema",
-  "policy",
+  "recipient_result_schema",
   "metadata",
   "webhook_url",
 ]) {
@@ -141,23 +147,30 @@ for (const property of [
   );
 }
 assertContract(
-  schemas.CreateCallRequest?.required?.includes("result_schema"),
-  "CreateCallRequest must require result_schema",
+  JSON.stringify(schemas.CreateCallRequest?.required) === JSON.stringify(["task"]),
+  "CreateCallRequest must require only task",
 );
 
-const callProperties = schemas.Call?.properties ?? {};
+const callProperties = schemas.CallTask?.properties ?? {};
 for (const property of [
   "id",
+  "object",
   "status",
+  "task",
+  "recipients",
   "structured_result",
-  "result_validation",
   "summary",
+  "task_completed",
+  "completion_confidence",
+  "evidence",
   "metadata",
   "created_at",
   "completed_at",
 ]) {
-  assertContract(callProperties[property], `Call missing ${property}`);
+  assertContract(callProperties[property], `CallTask missing ${property}`);
 }
+
+assertContract(!callProperties.result_validation, "CallTask must not expose result_validation");
 
 const eventListDataRef = schemas.EventList?.properties?.data?.items?.$ref;
 assertContract(
@@ -165,4 +178,4 @@ assertContract(
   "EventList.data must contain DeveloperEvent items",
 );
 
-console.log(`Verified Phase 1 OpenAPI contract at ${specPath}.`);
+console.log(`Verified CALL-E OpenAPI contract at ${specPath}.`);
