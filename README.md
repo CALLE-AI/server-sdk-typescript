@@ -24,7 +24,7 @@ pnpm add @call-e/calle
 Pin the current stable release when your deployment process requires exact package reproducibility:
 
 ```bash
-pnpm add @call-e/calle@0.2.0
+pnpm add @call-e/calle@0.2.1
 ```
 
 Use a local checkout for development and package smoke tests:
@@ -48,6 +48,30 @@ Run the create-and-wait example from a local checkout:
 
 ```bash
 pnpm run example:create-and-wait
+```
+
+Run the CLI from npm with `npx`:
+
+```bash
+npx @call-e/calle@latest calls create \
+  --api-key "$CALLE_API_KEY" \
+  --base-url "https://api.heycall-e.com" \
+  --phone "+14155550100" \
+  --task "Call this person and ask whether they can hear clearly." \
+  --wait \
+  --json
+```
+
+`--api-key` overrides `CALLE_API_KEY`. Prefer `CALLE_API_KEY` for shared scripts
+because command-line arguments may be stored in shell history.
+When `--wait` is used, progress messages are printed to stderr and the final
+call result is printed to stdout. Progress includes call status changes and any
+developer events returned by the call events API.
+
+Query an existing call:
+
+```bash
+npx @call-e/calle@latest calls get call_123 --api-key "$CALLE_API_KEY" --json
 ```
 
 Run the webhook receiver example:
@@ -134,7 +158,7 @@ pnpm add @call-e/calle
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
-The current stable version is `0.2.0`. Do not reuse a previously published npm version.
+The current stable version is `0.2.1`. Do not reuse a previously published npm version.
 
 ## Project Documents
 
