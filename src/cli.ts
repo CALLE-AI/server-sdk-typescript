@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { CalleClient } from "./client.js";
 import { CalleAPIError, CalleTimeoutError } from "./errors.js";
 import type { Call, CreateCallInput, EventList, ListEventsOptions } from "./calls.js";
@@ -335,7 +336,14 @@ export async function runCalleCli(options: RunCalleCliOptions): Promise<number> 
 
 function isDirectRun(): boolean {
   const entrypoint = process.argv[1];
-  return entrypoint !== undefined && import.meta.url === pathToFileURL(entrypoint).href;
+  if (entrypoint === undefined) {
+    return false;
+  }
+  try {
+    return realpathSync(entrypoint) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return import.meta.url === pathToFileURL(entrypoint).href;
+  }
 }
 
 if (isDirectRun()) {

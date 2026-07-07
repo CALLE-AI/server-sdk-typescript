@@ -24,7 +24,7 @@ pnpm add @call-e/calle
 Pin the current stable release when your deployment process requires exact package reproducibility:
 
 ```bash
-pnpm add @call-e/calle@0.2.1
+pnpm add @call-e/calle@0.2.2
 ```
 
 Use a local checkout for development and package smoke tests:
@@ -158,7 +158,7 @@ pnpm add @call-e/calle
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
-The current stable version is `0.2.1`. Do not reuse a previously published npm version.
+The current stable version is `0.2.2`. Do not reuse a previously published npm version.
 
 ## Project Documents
 

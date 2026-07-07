@@ -13,7 +13,7 @@ The first beta is published to npm:
 The current stable release version is:
 
 ```text
-@call-e/calle@0.2.1
+@call-e/calle@0.2.2
 ```
 
 Release publishing requires one of these release identities:
@@ -48,7 +48,7 @@ npm view @call-e/calle dist-tags version
 tmpdir="$(mktemp -d)"
 cd "$tmpdir"
 npm init -y
-npm install @call-e/calle@0.2.1
+npm install @call-e/calle@0.2.2
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
@@ -56,10 +56,10 @@ node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; consol
 
 The stable package should be available through the `latest` dist-tag.
 
-If `latest` still points to an older version after the stable publish, correct it only after confirming `0.2.1` is visible:
+If `latest` still points to an older version after the stable publish, correct it only after confirming `0.2.2` is visible:
 
 ```bash
-npm dist-tag add @call-e/calle@0.2.1 latest
+npm dist-tag add @call-e/calle@0.2.2 latest
 npm dist-tag ls @call-e/calle
 ```
 

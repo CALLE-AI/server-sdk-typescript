@@ -1,6 +1,6 @@
 {
   "name": "@call-e/calle",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "TypeScript server SDK for the CALL-E Developer API.",
   "type": "module",
   "keywords": [
@@ -37,7 +37,7 @@
     "verify:openapi": "node scripts/verify-openapi-contract.mjs",
     "typecheck:examples": "tsc --noEmit --module ESNext --moduleResolution Bundler --target ES2022 --strict --skipLibCheck --types node examples/create-and-wait.ts examples/webhook-server.ts",
     "test:package": "pnpm run build && node --input-type=module -e \"import('./dist/index.js').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\"",
-    "test:tarball": "pnpm run build && rm -f call-e-calle-*.tgz && tarball=$(npm pack --silent) && smoke_dir=$(mktemp -d) && cd \"$smoke_dir\" && npm init -y >/dev/null && npm install \"$OLDPWD/$tarball\" >/dev/null && node --input-type=module -e \"import('@call-e/calle').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\" && npx calle --help >/dev/null",
+    "test:tarball": "pnpm run build && rm -f call-e-calle-*.tgz && tarball=$(npm pack --silent) && smoke_dir=$(mktemp -d) && cd \"$smoke_dir\" && npm init -y >/dev/null && npm install \"$OLDPWD/$tarball\" >/dev/null && node --input-type=module -e \"import('@call-e/calle').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\" && npx calle --help | grep \"Usage:\" >/dev/null",
     "pack:check": "npm pack --dry-run",
     "validate": "pnpm run verify:openapi && pnpm run test && pnpm run typecheck && pnpm run typecheck:examples && pnpm run test:package && pnpm run pack:check && pnpm run test:tarball",
     "typecheck": "tsc -p tsconfig.json --noEmit"
