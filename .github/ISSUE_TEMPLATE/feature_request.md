@@ -20,12 +20,14 @@ Show the SDK API you would like to call.
 
 ## Scope
 
-Is this within the Phase 1 server SDK scope?
+Is this within the documented server SDK scope?
 
 - Create/read calls
 - Poll call results
+- List/read published Goals
+- Create/poll Goal Runs
 - List call events
-- Verify webhooks
+- Receive terminal webhooks
 
 ## Alternatives
 

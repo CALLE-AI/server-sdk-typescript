@@ -31,7 +31,7 @@ function parameterRefs(path, method) {
 
 assertContract(spec.openapi === "3.1.0", "expected OpenAPI 3.1.0");
 assertContract(spec.info?.title === "CALL-E Developer API", "unexpected title");
-assertContract(spec.info?.version === "0.2.0", "unexpected API version");
+assertContract(spec.info?.version === "0.6.0", "unexpected API version");
 
 const requiredOperations = [
   {
@@ -56,6 +56,36 @@ const requiredOperations = [
     operationId: "listCallEvents",
     responseSchema: "#/components/schemas/EventList",
     errorStatuses: ["401", "403", "404", "429", "500"],
+  },
+  {
+    path: "/v1/goals",
+    method: "get",
+    operationId: "listGoals",
+    responseSchema: "#/components/schemas/GoalList",
+    errorStatuses: ["400", "401", "403", "409", "429", "500"],
+  },
+  {
+    path: "/v1/goals/{goal_id}",
+    method: "get",
+    operationId: "getGoal",
+    responseSchema: "#/components/schemas/Goal",
+    errorStatuses: ["401", "403", "404", "409", "429", "500", "502", "503"],
+  },
+  {
+    path: "/v1/goals/{goal_id}/runs",
+    method: "post",
+    operationId: "createGoalRun",
+    requestSchema: "#/components/schemas/CreateGoalRunRequest",
+    responseStatus: "201",
+    responseSchema: "#/components/schemas/GoalRun",
+    errorStatuses: ["400", "401", "402", "403", "404", "409", "422", "429", "500", "502", "503"],
+  },
+  {
+    path: "/v1/goals/{goal_id}/runs/{goal_run_id}",
+    method: "get",
+    operationId: "getGoalRun",
+    responseSchema: "#/components/schemas/GoalRun",
+    errorStatuses: ["401", "403", "404", "429", "500", "502", "503"],
   },
   {
     path: "/calle/webhook",
@@ -95,13 +125,15 @@ for (const operation of requiredOperations) {
 }
 
 const webhookRefs = parameterRefs("/calle/webhook", "post");
-for (const ref of [
-  "#/components/parameters/WebhookEventId",
-  "#/components/parameters/WebhookTimestamp",
-  "#/components/parameters/WebhookSignature",
-]) {
-  assertContract(webhookRefs.includes(ref), `missing webhook parameter ${ref}`);
-}
+assertContract(
+  JSON.stringify(webhookRefs) === JSON.stringify(["#/components/parameters/WebhookEventId"]),
+  "webhook endpoint must expose only the event id header",
+);
+assertContract(
+  spec.components?.parameters?.WebhookTimestamp === undefined &&
+    spec.components?.parameters?.WebhookSignature === undefined,
+  "webhook contract must not expose legacy signature parameters",
+);
 assertContract(
   JSON.stringify(spec.paths?.["/calle/webhook"]?.post?.security) === "[]",
   "webhook endpoint must not require bearer auth",
@@ -126,6 +158,15 @@ for (const schemaName of [
   "WebhookEvent",
   "WebhookCallData",
   "WebhookAcknowledgement",
+  "GoalList",
+  "Goal",
+  "GoalPublishedRunSpec",
+  "CreateGoalRunRequest",
+  "GoalVariables",
+  "GoalRun",
+  "GoalRunSpecSnapshot",
+  "GoalRunStatus",
+  "GoalRunError",
   "ErrorEnvelope",
   "APIError",
 ]) {
@@ -176,6 +217,54 @@ const eventListDataRef = schemas.EventList?.properties?.data?.items?.$ref;
 assertContract(
   eventListDataRef === "#/components/schemas/DeveloperEvent",
   "EventList.data must contain DeveloperEvent items",
+);
+
+const createGoalRunProperties = schemas.CreateGoalRunRequest?.properties ?? {};
+assertContract(
+  JSON.stringify(Object.keys(createGoalRunProperties).sort()) ===
+    JSON.stringify(["phone", "variables"]),
+  "CreateGoalRunRequest must contain only phone and variables",
+);
+assertContract(
+  JSON.stringify(schemas.CreateGoalRunRequest?.required) === JSON.stringify(["phone"]),
+  "CreateGoalRunRequest must require only phone",
+);
+assertContract(
+  schemas.CreateGoalRunRequest?.additionalProperties === false,
+  "CreateGoalRunRequest must reject unknown fields",
+);
+
+const goalProperties = schemas.Goal?.properties ?? {};
+for (const property of ["id", "title", "description", "status", "published_run_spec"]) {
+  assertContract(goalProperties[property], `Goal missing ${property}`);
+}
+for (const checksum of ["semantic_checksum", "input_schema_checksum", "result_schema_checksum"]) {
+  assertContract(!goalProperties[checksum], `Goal must not expose ${checksum}`);
+  assertContract(
+    !schemas.GoalPublishedRunSpec?.properties?.[checksum],
+    `GoalPublishedRunSpec must not expose ${checksum}`,
+  );
+}
+
+const goalRunProperties = schemas.GoalRun?.properties ?? {};
+for (const property of [
+  "id",
+  "goal_id",
+  "run_id",
+  "run_spec",
+  "status",
+  "result",
+  "error",
+  "created_at",
+  "completed_at",
+]) {
+  assertContract(goalRunProperties[property], `GoalRun missing ${property}`);
+}
+
+const goalRunParameterRefs = parameterRefs("/v1/goals/{goal_id}/runs", "post");
+assertContract(
+  goalRunParameterRefs.includes("#/components/parameters/GoalRunIdempotencyKey"),
+  "create Goal Run must require the stable idempotency header",
 );
 
 console.log(`Verified CALL-E OpenAPI contract at ${specPath}.`);

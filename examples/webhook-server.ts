@@ -1,13 +1,9 @@
 import { createServer } from "node:http";
 import type { IncomingMessage } from "node:http";
-import { CalleClient, CalleWebhookSignatureError } from "../src/index.js";
+import type { WebhookEvent } from "../src/index.js";
 
-const client = new CalleClient({
-  apiKey: process.env.CALLE_API_KEY ?? "calle_dev_example"
-});
-
-const webhookSecret = process.env.CALLE_WEBHOOK_SECRET ?? "whsec_dev_example";
 const port = Number(process.env.PORT ?? "3000");
+const processedEventIds = new Set<string>();
 
 const server = createServer(async (request, response) => {
   if (request.method !== "POST" || request.url !== "/calle/webhook") {
@@ -19,16 +15,32 @@ const server = createServer(async (request, response) => {
   const rawBody = await readRequestBody(request);
 
   try {
-    const event = client.webhooks.unwrap({
-      rawBody,
-      headers: request.headers,
-      secret: webhookSecret
-    });
+    const event = JSON.parse(rawBody.toString("utf8")) as WebhookEvent;
+    const eventId = request.headers["call-e-event-id"];
+    if (typeof eventId !== "string" || eventId !== event.id) {
+      response.writeHead(400, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "invalid_event_id" }));
+      return;
+    }
+    if (processedEventIds.has(eventId)) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ received: true, duplicate: true }));
+      return;
+    }
 
+    // Use durable storage in production and persist the id before side effects.
+    processedEventIds.add(eventId);
     if (event.type === "call.completed") {
       console.log("Call completed", {
+        eventId,
         callId: event.data.id,
-        result: event.data.structured_result
+        taskCompleted: event.data.task_completed,
+        completionConfidence: event.data.completion_confidence,
+        evidence: event.data.evidence,
+        structuredResult: event.data.structured_result,
+        recipientResults: event.data.recipients.map(
+          (recipient) => recipient.structured_result
+        )
       });
     } else {
       console.log("CALL-E webhook event", {
@@ -40,14 +52,9 @@ const server = createServer(async (request, response) => {
 
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ received: true }));
-  } catch (error) {
-    if (error instanceof CalleWebhookSignatureError) {
-      response.writeHead(400, { "content-type": "application/json" });
-      response.end(JSON.stringify({ error: "invalid_signature" }));
-      return;
-    }
-
-    throw error;
+  } catch {
+    response.writeHead(400, { "content-type": "application/json" });
+    response.end(JSON.stringify({ error: "invalid_json" }));
   }
 });
 

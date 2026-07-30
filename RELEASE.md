@@ -13,7 +13,7 @@ The first beta is published to npm:
 The current stable release version is:
 
 ```text
-@call-e/calle@0.2.2
+@call-e/calle@0.6.0
 ```
 
 Release publishing requires one of these release identities:
@@ -32,6 +32,26 @@ pnpm run validate
 
 The CI workflow runs the same package checks on `main`.
 
+## Test API Goal smoke
+
+Before publishing a release that changes Goal behavior, run the local release
+candidate against a published Goal in the test environment:
+
+```bash
+export CALLE_API_KEY="<TEST_API_KEY>"
+export CALLE_BASE_URL="https://test-api.heycall-e.com"
+export CALLE_GOAL_ID="<PUBLISHED_TEST_GOAL_ID>"
+export CALLE_EXAMPLE_PHONE="<AUTHORIZED_TEST_E164_PHONE>"
+export CALLE_GOAL_VARIABLES='{"name":"Alex"}'
+export CALLE_IDEMPOTENCY_KEY="<UNIQUE_DURABLE_TEST_KEY>"
+pnpm run example:goal-run
+```
+
+This smoke test creates a real phone call. Use an authorized test number and a
+new idempotency key for a new logical test. Reuse the same key only when
+retrying that exact request. Record the returned Goal Run id and verify that
+exactly one of `result` or `error` is non-null.
+
 ## Stable npm publish
 
 1. Confirm `package.json` has a unique stable version.
@@ -48,18 +68,18 @@ npm view @call-e/calle dist-tags version
 tmpdir="$(mktemp -d)"
 cd "$tmpdir"
 npm init -y
-npm install @call-e/calle@0.2.2
-node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
+npm install @call-e/calle@0.6.0
+node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; const client = new CalleClient({ apiKey: "smoke" }); console.log(typeof client.goals.runAndWait)'
 ```
 
 ## Dist-tags
 
 The stable package should be available through the `latest` dist-tag.
 
-If `latest` still points to an older version after the stable publish, correct it only after confirming `0.2.2` is visible:
+If `latest` still points to an older version after the stable publish, correct it only after confirming `0.6.0` is visible:
 
 ```bash
-npm dist-tag add @call-e/calle@0.2.2 latest
+npm dist-tag add @call-e/calle@0.6.0 latest
 npm dist-tag ls @call-e/calle
 ```
 

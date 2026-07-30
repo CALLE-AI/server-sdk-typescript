@@ -1,6 +1,6 @@
 {
   "name": "@call-e/calle",
-  "version": "0.2.2",
+  "version": "0.6.0",
   "description": "TypeScript server SDK for the CALL-E Developer API.",
   "type": "module",
   "keywords": [
@@ -32,12 +32,13 @@
     "generate": "openapi-typescript openapi/calle.openapi.yaml -o src/generated/schema.ts",
     "build": "tsc -p tsconfig.json",
     "example:create-and-wait": "tsx examples/create-and-wait.ts",
+    "example:goal-run": "tsx examples/goal-run.ts",
     "example:webhook": "tsx examples/webhook-server.ts",
     "test": "vitest run",
     "verify:openapi": "node scripts/verify-openapi-contract.mjs",
-    "typecheck:examples": "tsc --noEmit --module ESNext --moduleResolution Bundler --target ES2022 --strict --skipLibCheck --types node examples/create-and-wait.ts examples/webhook-server.ts",
-    "test:package": "pnpm run build && node --input-type=module -e \"import('./dist/index.js').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\"",
-    "test:tarball": "pnpm run build && rm -f call-e-calle-*.tgz && tarball=$(npm pack --silent) && smoke_dir=$(mktemp -d) && cd \"$smoke_dir\" && npm init -y >/dev/null && npm install \"$OLDPWD/$tarball\" >/dev/null && node --input-type=module -e \"import('@call-e/calle').then((mod) => { if (typeof mod.CalleClient !== 'function') process.exit(1); })\" && npx calle --help | grep \"Usage:\" >/dev/null",
+    "typecheck:examples": "tsc --noEmit --module ESNext --moduleResolution Bundler --target ES2022 --strict --skipLibCheck --types node examples/create-and-wait.ts examples/goal-run.ts examples/webhook-server.ts",
+    "test:package": "pnpm run build && node --input-type=module -e \"import('./dist/index.js').then((mod) => { const client = new mod.CalleClient({ apiKey: 'smoke' }); if (typeof client.goals?.runAndWait !== 'function') process.exit(1); })\"",
+    "test:tarball": "pnpm run build && rm -f call-e-calle-*.tgz && tarball=$(npm pack --silent) && smoke_dir=$(mktemp -d) && cd \"$smoke_dir\" && npm init -y >/dev/null && npm install \"$OLDPWD/$tarball\" >/dev/null && node --input-type=module -e \"import('@call-e/calle').then((mod) => { const client = new mod.CalleClient({ apiKey: 'smoke' }); if (typeof client.goals?.runAndWait !== 'function') process.exit(1); })\" && npx calle --help | grep \"Usage:\" >/dev/null",
     "pack:check": "npm pack --dry-run",
     "validate": "pnpm run verify:openapi && pnpm run test && pnpm run typecheck && pnpm run typecheck:examples && pnpm run test:package && pnpm run pack:check && pnpm run test:tarball",
     "typecheck": "tsc -p tsconfig.json --noEmit"
