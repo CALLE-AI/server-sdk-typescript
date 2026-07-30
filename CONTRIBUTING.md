@@ -18,14 +18,21 @@ export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_EXAMPLE_PHONE="+14155550100"
 pnpm run example:create-and-wait
 
-export CALLE_WEBHOOK_SECRET="whsec_test_key"
+export CALLE_BASE_URL="https://test-api.heycall-e.com"
+export CALLE_GOAL_ID="<PUBLISHED_GOAL_ID>"
+export CALLE_EXAMPLE_PHONE="<E164_PHONE>"
+export CALLE_GOAL_VARIABLES='{"name":"Alex"}'
+export CALLE_IDEMPOTENCY_KEY="<DURABLE_UNIQUE_BUSINESS_KEY>"
+pnpm run example:goal-run
+
 pnpm run example:webhook
 ```
 
-The webhook example listens on `POST /calle/webhook` and verifies
-`CALL-E-Timestamp` plus `CALL-E-Signature` against the raw request body.
+The webhook example listens on `POST /calle/webhook` and processes terminal
+event JSON without a webhook secret or signature headers. Terminal webhook data
+includes the finalized post-call outcome and requested structured results.
 
-## Phase 1 scope
+## Supported API surface
 
 In scope:
 
@@ -33,9 +40,11 @@ In scope:
 - Read a call.
 - Poll until a terminal call result.
 - List call events.
-- Verify and unwrap signed webhook events.
+- List and read published Goals.
+- Create and poll Goal Runs until either `result` or `error` is available.
+- Receive terminal webhook events.
 
-Out of scope for Phase 1:
+Out of scope:
 
 - Browser SDK support.
 - Batch calls.
@@ -58,7 +67,7 @@ When the OpenAPI contract changes:
 ## Pull requests
 
 Keep changes small and focused. Include tests for wrapper behavior, error
-handling, webhook signature verification, and any changed API contract surface.
+handling, webhook event handling, and any changed API contract surface.
 
 Do not add browser examples or patterns that expose CALL-E API keys to client
 code.

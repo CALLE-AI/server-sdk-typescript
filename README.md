@@ -24,7 +24,7 @@ pnpm add @call-e/calle
 Pin the current stable release when your deployment process requires exact package reproducibility:
 
 ```bash
-pnpm add @call-e/calle@0.2.2
+pnpm add @call-e/calle@0.6.0
 ```
 
 Use a local checkout for development and package smoke tests:
@@ -49,6 +49,21 @@ Run the create-and-wait example from a local checkout:
 ```bash
 pnpm run example:create-and-wait
 ```
+
+Run a published Goal and wait for its structured result:
+
+```bash
+export CALLE_BASE_URL="https://test-api.heycall-e.com"
+export CALLE_GOAL_ID="<PUBLISHED_GOAL_ID>"
+export CALLE_EXAMPLE_PHONE="<E164_PHONE>"
+export CALLE_GOAL_VARIABLES='{"name":"Alex"}'
+export CALLE_IDEMPOTENCY_KEY="<DURABLE_UNIQUE_BUSINESS_KEY>"
+pnpm run example:goal-run
+```
+
+The Goal example performs a real call. Use an API key, Goal, phone number, and
+idempotency key for the selected environment. Persist and reuse the same key
+when retrying the same logical request.
 
 Run the CLI from npm with `npx`:
 
@@ -77,14 +92,73 @@ npx @call-e/calle@latest calls get call_123 --api-key "$CALLE_API_KEY" --json
 Run the webhook receiver example:
 
 ```bash
-export CALLE_WEBHOOK_SECRET="whsec_test_key"
 pnpm run example:webhook
 ```
 
-The webhook receiver listens on `POST /calle/webhook` and verifies
-`CALL-E-Timestamp` and `CALL-E-Signature` against the raw request body.
+The webhook receiver listens on `POST /calle/webhook` and processes terminal
+event JSON without a webhook secret or signature headers. CALL-E sends the
+event only after the post-call outcome and requested structured results are
+finalized. Deduplicate side effects with the event `id` or
+`CALL-E-Event-Id`, and reject events when the required header does not match
+the body `id`.
+
+The `client.webhooks.verify` and signed `client.webhooks.unwrap` methods
+implement the legacy SDK `0.2` contract. They remain available for source
+compatibility but are deprecated and are not compatible with current unsigned
+CALL-E deliveries.
 
 ## Quickstart
+
+Run a reusable published Goal. The Goal owns its input and result schemas;
+each Run supplies only a phone number, per-Run variables, and a durable
+idempotency key:
+
+```ts
+import { CalleClient } from "@call-e/calle";
+
+const client = new CalleClient({
+  apiKey: process.env.CALLE_API_KEY!
+});
+
+const goal = await client.goals.get("goal_delivery_confirmation");
+console.log(goal.title, goal.publishedRunSpec.inputSchema);
+
+const run = await client.goals.runAndWait({
+  goalId: goal.id,
+  phone: "+14155550100",
+  variables: {
+    customer_name: "Taylor",
+    order_reference: "ORD-8472",
+    delivery_window: "July 24, 2:00-4:00 PM"
+  },
+  idempotencyKey: "delivery:ORD-8472:confirm-window:v1"
+});
+
+if (run.result !== null) {
+  console.log(run.result);
+} else {
+  console.error(run.error);
+}
+```
+
+Run the same published Goal through the CLI:
+
+```bash
+npx @call-e/calle@0.6.0 goals run \
+  --goal-id "goal_delivery_confirmation" \
+  --phone "+14155550100" \
+  --variables '{"customer_name":"Taylor","order_reference":"ORD-8472","delivery_window":"July 24, 2:00-4:00 PM"}' \
+  --idempotency-key "delivery:ORD-8472:confirm-window:v1" \
+  --wait \
+  --json
+```
+
+Persist the idempotency key before the first request and reuse it for network
+retries. `waitForResult` returns when either `result` or `error` is non-null;
+an execution `status` of `completed` can still be waiting for result
+materialization.
+
+The generic one-shot call API remains available independently:
 
 ```ts
 import { CalleClient } from "@call-e/calle";
@@ -122,16 +196,6 @@ console.log(call.taskCompleted, call.completionConfidence, call.evidence);
 console.log(call.recipients[0]?.structuredResult);
 ```
 
-## Webhook Verification
-
-```ts
-const event = client.webhooks.unwrap({
-  rawBody,
-  headers,
-  secret: process.env.CALLE_WEBHOOK_SECRET!
-});
-```
-
 ## Release
 
 This repository publishes the npm package `@call-e/calle`.
@@ -158,7 +222,8 @@ pnpm add @call-e/calle
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
-The current stable version is `0.2.2`. Do not reuse a previously published npm version.
+The current stable version is `0.6.0`. Do not reuse a previously published npm
+version.
 
 ## Project Documents
 

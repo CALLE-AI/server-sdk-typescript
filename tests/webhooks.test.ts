@@ -8,7 +8,7 @@ function sign(rawBody: Buffer, timestamp: string, secret: string): string {
 }
 
 describe("CalleClient webhooks", () => {
-  it("verifies a valid CALL-E signature", () => {
+  it("keeps legacy signature verification available", () => {
     const client = new CalleClient({ apiKey: "key_test" });
     const rawBody = Buffer.from(
       '{"id":"evt_123","type":"call.completed","created_at":"2026-05-31T00:00:00Z","data":{"object":"call","id":"call_123","status":"completed"}}'
@@ -19,7 +19,7 @@ describe("CalleClient webhooks", () => {
     expect(client.webhooks.verify({ rawBody, timestamp, signature, secret: "whsec_dev" })).toBe(true);
   });
 
-  it("unwraps a valid event", () => {
+  it("unwraps a legacy signed event", () => {
     const client = new CalleClient({ apiKey: "key_test" });
     const rawBody = Buffer.from(
       '{"id":"evt_123","type":"call.completed","created_at":"2026-05-31T00:00:00Z","data":{"object":"call","id":"call_123","status":"completed"}}'
@@ -40,7 +40,7 @@ describe("CalleClient webhooks", () => {
     expect(event.type).toBe("call.completed");
   });
 
-  it("rejects invalid webhook signatures", () => {
+  it("rejects invalid legacy webhook signatures", () => {
     const client = new CalleClient({ apiKey: "key_test" });
 
     expect(() =>

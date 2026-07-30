@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { CalleClient } from "./client.js";
 import { CalleAPIError, CalleTimeoutError } from "./errors.js";
 import type { Call, CreateCallInput, EventList, ListEventsOptions } from "./calls.js";
+import type { GoalRun, GoalVariables, RunGoalInput, WaitForGoalResultOptions } from "./goals.js";
 
 interface CliClient {
   calls: {
@@ -11,6 +12,10 @@ interface CliClient {
     createAndWait(input: CreateCallInput, options?: RequestOptions & WaitOptions): Promise<Call>;
     get(callId: string): Promise<Call>;
     listEvents(callId: string, options?: ListEventsOptions): Promise<EventList>;
+  };
+  goals: {
+    run(input: RunGoalInput): Promise<GoalRun>;
+    runAndWait(input: RunGoalInput, options?: WaitForGoalResultOptions): Promise<GoalRun>;
   };
 }
 
@@ -31,6 +36,7 @@ interface ClientOptions {
 interface CliFlags {
   apiKey?: string;
   baseUrl?: string;
+  goalId?: string;
   help: boolean;
   idempotencyKey?: string;
   intervalMs?: number;
@@ -38,6 +44,7 @@ interface CliFlags {
   phones: string[];
   task?: string;
   timeoutMs?: number;
+  variables?: string;
   wait: boolean;
 }
 
@@ -62,17 +69,20 @@ export interface RunCalleCliOptions {
 const usage = `Usage:
   calle calls create --task <text> [--phone <E164>] [--wait] [--api-key <key>]
   calle calls get <call_id> [--api-key <key>]
+  calle goals run --goal-id <goal_id> --phone <E164> --idempotency-key <key> [--variables <json>] [--wait]
 
 Options:
   --api-key <key>             CALL-E API key. Overrides CALLE_API_KEY.
   --base-url <url>            CALL-E API base URL. Overrides CALLE_BASE_URL.
+  --goal-id <goal_id>         Published Goal identity.
   --phone <number>            E.164 phone number. Repeatable.
   --task <text>               Call task instruction.
-  --wait                      Poll until the call reaches a terminal status.
+  --variables <json>          JSON object containing per-Run scalar variables.
+  --wait                      Poll until the requested call or Goal result is ready.
   --idempotency-key <key>     Idempotency key for create requests.
   --interval-ms <ms>          Poll interval when --wait is used.
   --timeout-ms <ms>           Wait timeout when --wait is used.
-  --json                      Print the full call object as JSON.
+  --json                      Print the full response object as JSON.
   --help                      Show this help.
 `;
 
@@ -118,11 +128,17 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--base-url") {
       flags.baseUrl = readOption(argv, index, arg);
       index += 1;
+    } else if (arg === "--goal-id") {
+      flags.goalId = readOption(argv, index, arg);
+      index += 1;
     } else if (arg === "--phone") {
       flags.phones.push(readOption(argv, index, arg));
       index += 1;
     } else if (arg === "--task") {
       flags.task = readOption(argv, index, arg);
+      index += 1;
+    } else if (arg === "--variables") {
+      flags.variables = readOption(argv, index, arg);
       index += 1;
     } else if (arg === "--idempotency-key") {
       flags.idempotencyKey = readOption(argv, index, arg);
@@ -184,6 +200,93 @@ function printCall(call: Call, json: boolean, stdout: (text: string) => void): v
     return;
   }
   stdout(`${call.id}\t${call.status}\n`);
+}
+
+function parseGoalVariables(raw: string | undefined): GoalVariables | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("--variables must be a valid JSON object.");
+  }
+  if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("--variables must be a JSON object.");
+  }
+
+  for (const value of Object.values(parsed)) {
+    const isScalar =
+      typeof value === "string" ||
+      typeof value === "boolean" ||
+      (typeof value === "number" && Number.isFinite(value));
+    if (!isScalar) {
+      throw new Error("--variables values must be finite JSON strings, numbers, or booleans.");
+    }
+  }
+  return parsed as GoalVariables;
+}
+
+function createGoalRunInput(flags: CliFlags): RunGoalInput {
+  if (!flags.goalId) {
+    throw new Error("Missing Goal id. Pass --goal-id <goal_id>.");
+  }
+  if (flags.phones.length !== 1) {
+    throw new Error("Goal Runs require exactly one --phone <E164>.");
+  }
+  if (!flags.idempotencyKey) {
+    throw new Error("Goal Runs require --idempotency-key <key>.");
+  }
+  if (flags.task !== undefined) {
+    throw new Error("--task is not accepted for Goal Runs; the published Goal owns the task.");
+  }
+
+  const input: RunGoalInput = {
+    goalId: flags.goalId,
+    phone: flags.phones[0]!,
+    idempotencyKey: flags.idempotencyKey
+  };
+  const variables = parseGoalVariables(flags.variables);
+  if (variables !== undefined) {
+    input.variables = variables;
+  }
+  return input;
+}
+
+function goalWaitOptions(flags: CliFlags): WaitForGoalResultOptions {
+  const options: WaitForGoalResultOptions = {};
+  if (flags.intervalMs !== undefined) {
+    options.intervalMs = flags.intervalMs;
+  }
+  if (flags.timeoutMs !== undefined) {
+    options.timeoutMs = flags.timeoutMs;
+  }
+  return options;
+}
+
+function printGoalRun(run: GoalRun, json: boolean, stdout: (text: string) => void): void {
+  if (json) {
+    stdout(`${JSON.stringify(run, null, 2)}\n`);
+    return;
+  }
+  stdout(`${run.id}\t${run.status}\n`);
+}
+
+function failOnGoalRunError(run: GoalRun): void {
+  if (run.error !== null) {
+    throw new Error(`Goal Run ${run.id} failed: ${run.error.message} (${run.error.code}).`);
+  }
+}
+
+function rejectGoalOnlyFlagsForCalls(flags: CliFlags): void {
+  if (flags.goalId !== undefined) {
+    throw new Error("--goal-id is only accepted for Goal commands.");
+  }
+  if (flags.variables !== undefined) {
+    throw new Error("--variables is only accepted for Goal commands.");
+  }
 }
 
 function formatError(error: unknown): string {
@@ -300,6 +403,26 @@ async function runGet(positionals: string[], flags: CliFlags, client: CliClient,
   printCall(call, flags.json, stdout);
 }
 
+async function runGoal(
+  flags: CliFlags,
+  client: CliClient,
+  stdout: (text: string) => void,
+  stderr: (text: string) => void
+): Promise<void> {
+  const input = createGoalRunInput(flags);
+  if (!flags.wait) {
+    const run = await client.goals.run(input);
+    printGoalRun(run, flags.json, stdout);
+    failOnGoalRunError(run);
+    return;
+  }
+
+  stderr("Creating and waiting for Goal Run result...\n");
+  const run = await client.goals.runAndWait(input, goalWaitOptions(flags));
+  printGoalRun(run, flags.json, stdout);
+  failOnGoalRunError(run);
+}
+
 export async function runCalleCli(options: RunCalleCliOptions): Promise<number> {
   const createClient = options.createClient ?? ((clientInput: ClientOptions) => new CalleClient(clientInput));
 
@@ -311,10 +434,20 @@ export async function runCalleCli(options: RunCalleCliOptions): Promise<number> 
     }
 
     const [resource, action, ...positionals] = parsed.positionals;
+    if (resource === "goals") {
+      if (action !== "run") {
+        throw new Error(`Unknown goals command: ${action ?? ""}`);
+      }
+      const apiKey = requireApiKey(parsed.flags, options.env);
+      const client = createClient(clientOptions(apiKey, parsed.flags, options.env));
+      await runGoal(parsed.flags, client, options.stdout, options.stderr);
+      return 0;
+    }
     if (resource !== "calls") {
       throw new Error(`Unknown command: ${resource}`);
     }
 
+    rejectGoalOnlyFlagsForCalls(parsed.flags);
     const apiKey = requireApiKey(parsed.flags, options.env);
     const client = createClient(clientOptions(apiKey, parsed.flags, options.env));
 

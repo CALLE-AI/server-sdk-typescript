@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { runCalleCli } from "../src/cli.js";
-import type { Call, EventList } from "../src/index.js";
+import type { Call, EventList, GoalRun } from "../src/index.js";
 
 const completedCall: Call = {
   id: "call_123",
@@ -51,6 +51,32 @@ const emptyEvents: EventList = {
   object: "list",
   data: [],
   nextCursor: "2-0"
+};
+
+const completedGoalRun: GoalRun = {
+  object: "goal_run",
+  id: "rgrp_delivery_8472",
+  goalId: "goal_delivery",
+  runId: "run_delivery_8472",
+  runSpec: { id: "rspec_delivery_v4", version: 4 },
+  status: "completed",
+  result: {
+    delivery_outcome: "confirmed"
+  },
+  error: null,
+  createdAt: "2026-07-23T04:00:00Z",
+  completedAt: "2026-07-23T04:01:00Z"
+};
+
+const failedGoalRun: GoalRun = {
+  ...completedGoalRun,
+  status: "failed",
+  result: null,
+  error: {
+    code: "no_answer",
+    message: "No human answered the call.",
+    detailCode: "provider_no_answer"
+  }
 };
 
 describe("calle CLI", () => {
@@ -180,5 +206,237 @@ describe("calle CLI", () => {
     expect(createClient).toHaveBeenCalledWith({ apiKey: "cli_key" });
     expect(get).toHaveBeenCalledWith("call_123");
     expect(JSON.parse(stdout.join(""))).toMatchObject({ id: "call_123", status: "completed" });
+  });
+
+  it("runs and waits for a published Goal with scalar variables", async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const run = vi.fn();
+    const runAndWait = vi.fn(async () => completedGoalRun);
+    const createClient = vi.fn(() => ({
+      calls: {
+        create: vi.fn(),
+        createAndWait: vi.fn(),
+        get: vi.fn(),
+        listEvents: vi.fn()
+      },
+      goals: {
+        run,
+        runAndWait
+      }
+    }));
+
+    const exitCode = await runCalleCli({
+      argv: [
+        "goals",
+        "run",
+        "--goal-id",
+        "goal_delivery",
+        "--phone",
+        "+14155550100",
+        "--variables",
+        '{"order_reference":"ORD-8472"}',
+        "--idempotency-key",
+        "delivery:ORD-8472:v1",
+        "--wait",
+        "--interval-ms",
+        "1000",
+        "--timeout-ms",
+        "600000",
+        "--api-key",
+        "cli_key",
+        "--base-url",
+        "http://127.0.0.1:8000",
+        "--json"
+      ],
+      env: {},
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+      createClient
+    });
+
+    expect(exitCode).toBe(0);
+    expect(createClient).toHaveBeenCalledWith({
+      apiKey: "cli_key",
+      baseUrl: "http://127.0.0.1:8000"
+    });
+    expect(runAndWait).toHaveBeenCalledWith(
+      {
+        goalId: "goal_delivery",
+        phone: "+14155550100",
+        variables: { order_reference: "ORD-8472" },
+        idempotencyKey: "delivery:ORD-8472:v1"
+      },
+      {
+        intervalMs: 1000,
+        timeoutMs: 600000
+      }
+    );
+    expect(run).not.toHaveBeenCalled();
+    expect(stderr.join("")).toContain("Creating and waiting for Goal Run result...");
+    expect(JSON.parse(stdout.join(""))).toMatchObject({
+      id: "rgrp_delivery_8472",
+      result: { delivery_outcome: "confirmed" }
+    });
+  });
+
+  it("returns an error exit code when a waited Goal Run has a domain error", async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const runAndWait = vi.fn(async () => failedGoalRun);
+    const createClient = vi.fn(() => ({
+      calls: {
+        create: vi.fn(),
+        createAndWait: vi.fn(),
+        get: vi.fn(),
+        listEvents: vi.fn()
+      },
+      goals: {
+        run: vi.fn(),
+        runAndWait
+      }
+    }));
+
+    const exitCode = await runCalleCli({
+      argv: [
+        "goals",
+        "run",
+        "--goal-id",
+        "goal_delivery",
+        "--phone",
+        "+14155550100",
+        "--idempotency-key",
+        "delivery:ORD-8472:v1",
+        "--wait",
+        "--api-key",
+        "cli_key",
+        "--json"
+      ],
+      env: {},
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+      createClient
+    });
+
+    expect(exitCode).toBe(1);
+    expect(JSON.parse(stdout.join(""))).toMatchObject({
+      id: "rgrp_delivery_8472",
+      error: { code: "no_answer" }
+    });
+    expect(stderr.join("")).toContain("Goal Run rgrp_delivery_8472 failed");
+  });
+
+  it("returns an error exit code for an immediate failed Goal Run replay", async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const run = vi.fn(async () => failedGoalRun);
+    const runAndWait = vi.fn();
+    const createClient = vi.fn(() => ({
+      calls: {
+        create: vi.fn(),
+        createAndWait: vi.fn(),
+        get: vi.fn(),
+        listEvents: vi.fn()
+      },
+      goals: {
+        run,
+        runAndWait
+      }
+    }));
+
+    const exitCode = await runCalleCli({
+      argv: [
+        "goals",
+        "run",
+        "--goal-id",
+        "goal_delivery",
+        "--phone",
+        "+14155550100",
+        "--idempotency-key",
+        "delivery:ORD-8472:v1",
+        "--api-key",
+        "cli_key",
+        "--json"
+      ],
+      env: {},
+      stdout: (text) => stdout.push(text),
+      stderr: (text) => stderr.push(text),
+      createClient
+    });
+
+    expect(exitCode).toBe(1);
+    expect(run).toHaveBeenCalledOnce();
+    expect(runAndWait).not.toHaveBeenCalled();
+    expect(JSON.parse(stdout.join(""))).toMatchObject({
+      id: "rgrp_delivery_8472",
+      error: { code: "no_answer" }
+    });
+    expect(stderr.join("")).toContain("Goal Run rgrp_delivery_8472 failed");
+  });
+
+  it("requires an explicit idempotency key for Goal Runs", async () => {
+    const stderr: string[] = [];
+    const run = vi.fn();
+    const createClient = vi.fn(() => ({
+      calls: {
+        create: vi.fn(),
+        createAndWait: vi.fn(),
+        get: vi.fn(),
+        listEvents: vi.fn()
+      },
+      goals: {
+        run,
+        runAndWait: vi.fn()
+      }
+    }));
+
+    const exitCode = await runCalleCli({
+      argv: [
+        "goals",
+        "run",
+        "--goal-id",
+        "goal_delivery",
+        "--phone",
+        "+14155550100",
+        "--api-key",
+        "cli_key"
+      ],
+      env: {},
+      stdout: () => undefined,
+      stderr: (text) => stderr.push(text),
+      createClient
+    });
+
+    expect(exitCode).toBe(1);
+    expect(run).not.toHaveBeenCalled();
+    expect(stderr.join("")).toContain("Goal Runs require --idempotency-key");
+  });
+
+  it.each([
+    {
+      name: "--goal-id on calls create",
+      argv: ["calls", "create", "--task", "Call.", "--goal-id", "goal_delivery"],
+      message: "--goal-id is only accepted for Goal commands"
+    },
+    {
+      name: "--variables on calls get",
+      argv: ["calls", "get", "call_123", "--variables", '{"name":"Alex"}'],
+      message: "--variables is only accepted for Goal commands"
+    }
+  ])("rejects $name", async ({ argv, message }) => {
+    const stderr: string[] = [];
+    const createClient = vi.fn();
+
+    const exitCode = await runCalleCli({
+      argv,
+      env: {},
+      stdout: () => undefined,
+      stderr: (text) => stderr.push(text),
+      createClient
+    });
+
+    expect(exitCode).toBe(1);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(stderr.join("")).toContain(message);
   });
 });

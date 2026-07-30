@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * Create Call
-         * @description Create an asynchronous call.
+         * @description Create an asynchronous call. Use `result_schema` and `recipient_result_schema` to ask CALL-E to extract structured JSON results from terminal call evidence.
          */
         post: operations["createCall"];
         delete?: never;
@@ -64,6 +64,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Goals
+         * @description List the authenticated owner's active, listed Goals that have a published RunSpec. For
+         *     example, a fulfillment service can inspect the published interface for its reusable
+         *     delivery-confirmation workflow before creating phone-specific Runs.
+         *
+         *     Results are ordered by opaque Goal identity. Use `next_cursor` as the next request's
+         *     `after` value; clients must not parse or construct cursor values. `title` and `description`
+         *     help operators recognize each published workflow, but integrations should still store the
+         *     intended `goal_id` at publish time and must not execute the first list item blindly.
+         */
+        get: operations["listGoals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/goals/{goal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Goal
+         * @description Get an owner-scoped active Goal and its currently published immutable RunSpec interface.
+         *
+         *     Store the `goal_id` returned by Chat publish success. `title` and `description` explain the
+         *     current published workflow. Before sending a delivery-confirmation Run, use `input_schema`
+         *     to verify that `customer_name`, `order_reference`, and `delivery_window` match the current
+         *     published version, and use `result_schema` to prepare downstream outcome handling.
+         *
+         *     This endpoint does not search by title, objective, or recency, and does not expose authoring
+         *     instructions, provider bindings, or result materialization guidance. The
+         *     server always resolves the current published pointer for a new business key.
+         */
+        get: operations["getGoal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/goals/{goal_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Goal Run
+         * @description Create one singleton Goal Run for a published Goal.
+         *
+         *     In a delivery-confirmation integration, `phone` identifies one customer and `variables`
+         *     provide that order's reference and proposed window. CALL-E atomically resolves and pins the
+         *     published RunSpec, validates the variables, and durably accepts execution.
+         *
+         *     The request cannot select, replace, or relax schemas or the materialization contract. The
+         *     first accepted request and an exact idempotent replay both return `201` with the same Goal
+         *     Run identity. A `201` response means durable acceptance, not that the recipient answered or
+         *     that `result` is ready.
+         */
+        post: operations["createGoalRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/goals/{goal_id}/runs/{goal_run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Goal Run
+         * @description Get an owner- and Goal-scoped Run and its structured result facts.
+         *
+         *     This is a pure read of the immutable execution snapshot. It does not resolve the current
+         *     Goal pointer, dispatch work, or start result materialization. Use the `GoalRun.id` returned
+         *     by create as `goal_run_id`; the nested telephone `run_id` is not valid in this path.
+         *
+         *     Poll until either `result` or `error` is non-null. A non-null `result` is the parsed object
+         *     validated against the published result schema. A non-null `error` means this Run will not
+         *     produce a result. `status: completed` with both fields null means result processing is still
+         *     in progress.
+         */
+        get: operations["getGoalRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/calle/webhook": {
         parameters: {
             query?: never;
@@ -75,7 +189,7 @@ export interface paths {
         put?: never;
         /**
          * Server Message
-         * @description CALL-E sends this request to your server when a call reaches a terminal state. Configure this URL with `webhook_url` on create call or through project-level webhook settings.
+         * @description CALL-E sends this request after a call reaches a terminal state and its post-call outcome and requested structured results are finalized. Configure this URL with `webhook_url` on create call or through project-level webhook settings.
          */
         post: operations["receiveWebhookEvent"];
         delete?: never;
@@ -88,16 +202,200 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Cursor-paginated collection of the authenticated owner's listed, active, published Goal
+         *     interfaces. Use this for discovery or recovery of a known Goal id, not as title search.
+         */
+        GoalList: {
+            /**
+             * @description Always `list` for paginated list responses.
+             * @enum {string}
+             */
+            object: "list";
+            /**
+             * @description Goal interfaces in stable opaque-id order. Do not assume the first item is the Goal your
+             *     workflow should execute; store the intended `goal_id` when it is published.
+             */
+            data: components["schemas"]["Goal"][];
+            /** @description Opaque cursor for the next page. `null` means there are no more Goals. */
+            next_cursor: string | null;
+        };
+        /**
+         * @description Owner-scoped active Goal and its currently published immutable RunSpec interface. This is an
+         *     execution contract, not an authoring record: it includes a developer-facing title and
+         *     description but omits prompts, provider settings, and history.
+         */
+        Goal: {
+            /**
+             * @description Always `goal` for Goal responses.
+             * @enum {string}
+             */
+            object: "goal";
+            /** @description Opaque Goal identity. This is distinct from the nested RunSpec identity. */
+            id: string;
+            /** @description Short developer-facing title from the current published RunSpec. It may be null for an untitled Goal. */
+            title: string | null;
+            /** @description Developer-facing summary of what the current published Goal does. This is not the execution prompt. */
+            description: string;
+            /**
+             * @description Always `active`; non-executable Goals are not returned by this surface.
+             * @enum {string}
+             */
+            status: "active";
+            /**
+             * @description Currently published immutable interface used to validate new `variables` and interpret
+             *     `result`. New business keys pin this version at acceptance time.
+             */
+            published_run_spec: components["schemas"]["GoalPublishedRunSpec"];
+        };
+        /**
+         * @description Read-only published RunSpec interface for a Goal. Applications should inspect the schemas
+         *     before constructing variables and should record the version used by deployments.
+         */
+        GoalPublishedRunSpec: {
+            /** @description Opaque immutable RunSpec identity. */
+            id: string;
+            /** @description Monotonic published version within this Goal. A later publish affects only new Runs. */
+            version: number;
+            /**
+             * @description Normalized JSON Schema for per-Run `variables`. Respect `required`, property types, enum
+             *     values, defaults, and `additionalProperties`; invalid input is rejected before execution.
+             */
+            input_schema: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description Normalized JSON Schema for `result`. CALL-E exposes a result only after it is
+             *     validated against this exact pinned schema and durably persisted.
+             */
+            result_schema: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * @description One phone-specific submission against the Goal's currently published RunSpec. The object is
+         *     closed: target wrappers, per-Run region/locale/display-name hints, task text, schemas, RunSpec
+         *     selectors, provider settings, and unknown fields are not accepted. Region, callee locale, and
+         *     runtime profile come from the published Goal. Use the required `Idempotency-Key` header for
+         *     retry safety.
+         */
+        CreateGoalRunRequest: {
+            /**
+             * @description Recipient phone in canonical E.164 form: `+`, country code, and subscriber number with
+             *     no spaces, punctuation, or extension. The caller must be authorized to contact it.
+             *     CALL-E validates it against the published Goal's fixed Voice Target policy.
+             */
+            phone: string;
+            /**
+             * @description Per-Run business context validated against the pinned published `input_schema`. Keys and
+             *     required fields vary by Goal. Values must be finite JSON strings, numbers, or booleans;
+             *     nested objects, arrays, and null are not supported. Omit for Goals whose schema accepts `{}`.
+             * @default {}
+             */
+            variables: components["schemas"]["GoalVariables"];
+        };
+        /** @description Scalar value supported by published Goal input and result Schema profiles. */
+        GoalScalar: string | number | boolean;
+        /**
+         * @description Dynamic variable map validated by the exact published input schema pinned during acceptance.
+         *     Read the Goal interface rather than hard-coding undocumented keys.
+         */
+        GoalVariables: {
+            [key: string]: components["schemas"]["GoalScalar"];
+        };
+        /**
+         * @description Public projection of one phone-specific execution of a published Goal. A non-null `result`
+         *     is a successfully parsed and persisted object. A non-null `error` means the Run will not
+         *     produce a result. When both are null, continue polling.
+         */
+        GoalRun: {
+            /** @enum {string} */
+            object: "goal_run";
+            /** @description Public Goal Run identity. Persist this value and use it as `goal_run_id` when polling. */
+            id: string;
+            /** @description Goal identity supplied in the create path. */
+            goal_id: string;
+            /** @description Internal execution member exposed for correlation; do not use it in the Goal Run polling path. */
+            run_id: string;
+            /** @description Read-only identity and version of the exact RunSpec pinned by this Run. */
+            run_spec: components["schemas"]["GoalRunSpecSnapshot"];
+            status: components["schemas"]["GoalRunStatus"];
+            /**
+             * @description Parsed result validated against the published result schema and durably persisted, or
+             *     `null` while processing or when the Run has an error. Its keys vary by Goal.
+             */
+            result: {
+                [key: string]: components["schemas"]["GoalScalar"];
+            } | null;
+            /**
+             * @description Unified execution or result-processing error, or `null`. Branch on `code`; keep `message`
+             *     for logs and operators. A non-null error is final and is mutually exclusive with `result`.
+             */
+            error: components["schemas"]["GoalRunError"] | null;
+            /**
+             * Format: date-time
+             * @description UTC time at which CALL-E durably accepted this Goal Run.
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description UTC telephone-execution completion time, or `null` while execution is non-terminal.
+             */
+            completed_at: string | null;
+        };
+        /** @description Exact immutable RunSpec identity and version pinned by a Goal Run. */
+        GoalRunSpecSnapshot: {
+            /** @description Exact immutable RunSpec id pinned when the Goal Run was accepted. */
+            id: string;
+            /** @description Published RunSpec version pinned for this Goal Run. */
+            version: number;
+        };
+        /**
+         * @description Stable telephone execution state. `queued` and `in_progress` are non-terminal; `completed`,
+         *     `failed`, and `canceled` are terminal. A completed call can still have `result: null` and
+         *     `error: null` briefly while CALL-E parses and saves the result.
+         * @enum {string}
+         */
+        GoalRunStatus: "queued" | "in_progress" | "completed" | "failed" | "canceled";
+        /** @description Unified safe error returned when a Goal Run cannot produce a usable result. */
+        GoalRunError: {
+            /** @enum {string} */
+            code: "call_failed" | "no_answer" | "declined" | "timed_out" | "canceled" | "result_invalid" | "result_unavailable" | "result_failed";
+            /** @description Human-readable safe explanation. Do not parse this field for application logic. */
+            message: string;
+            /** @description Optional low-cardinality diagnostic detail safe for logs or narrow application branching. */
+            detail_code: string | null;
+        };
         CreateCallRequest: {
             /** @description Natural-language instruction for the call task. Include the goal, relevant details the voice agent should know, and the exact information you want collected. */
             task: string;
             /** @description Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use. */
             recipients?: components["schemas"]["CallTaskRecipientRequest"][] | null;
-            /** @description Optional JSON Schema object that defines the structured result CALL-E should extract for the whole call task. Object schemas are strict by default; fields not declared in `properties` are rejected. */
+            /**
+             * @description Optional JSON Schema object that defines the structured result CALL-E should extract for the whole call task.
+             *
+             *     CALL-E passes the schema, including field `description` values, to the extraction model after the call reaches a terminal state. Use descriptions to explain field meaning and enum selection logic, for example: "Use strong when the prospect asks about pricing, demos, or next steps."
+             *
+             *     Descriptions guide extraction but are not hard validation rules. Hard validation comes from `type`, `required`, `enum`, and `additionalProperties`.
+             *
+             *     Supported schema features are `type`, `properties`, `required`, `enum`, nested `object` fields, simple `array.items`, `description`, and `additionalProperties: false`. Unsupported features include `$ref`, `oneOf`, `anyOf`, `allOf`, recursive schemas, complex format validation, and `additionalProperties: true`.
+             *
+             *     Prefer string enums over booleans for business decisions that may be unclear, and include an `unknown` enum value when the call may not provide enough evidence.
+             */
             result_schema?: {
                 [key: string]: unknown;
             } | null;
-            /** @description Optional JSON Schema object that defines the structured result CALL-E should extract for each recipient. Object schemas are strict by default; fields not declared in `properties` are rejected. */
+            /**
+             * @description Optional JSON Schema object that defines the structured result CALL-E should extract independently for each recipient.
+             *
+             *     This is useful for batch calls where each recipient needs their own outcome, such as `can_attend`, `confirmed`, `requested_callback`, or `interest_level`.
+             *
+             *     Do not use reserved recipient response field names such as `summary`, `status`, `transcript`, `call_id`, or timing fields as custom result fields. Use names such as `customer_summary`, `notes`, or `reason` instead.
+             *
+             *     Field `description` values are passed to the extraction model and should explain how enum values should be selected. Descriptions guide extraction but are not hard validation rules. Hard validation comes from `type`, `required`, `enum`, and `additionalProperties`.
+             *
+             *     Object schemas are strict by default. Fields not declared in `properties` are rejected, and unsupported or invalid recipient results are returned as `null`.
+             */
             recipient_result_schema?: {
                 [key: string]: unknown;
             } | null;
@@ -120,7 +418,7 @@ export interface components {
             region?: string | null;
         };
         /**
-         * @description Current lifecycle state of a CALL-E call.
+         * @description Current lifecycle state of a CALL-E call. `in_progress` includes post-call result finalization; terminal states are published only after the post-call outcome is available.
          * @enum {string}
          */
         CallStatus: "queued" | "in_progress" | "completed" | "failed" | "canceled";
@@ -192,7 +490,11 @@ export interface components {
             region: string | null;
             /** @description Current recipient lifecycle state. */
             status: components["schemas"]["RecipientStatus"];
-            /** @description Schema-valid structured result object extracted for this recipient. `null` when no usable structured result object was produced. */
+            /**
+             * @description Schema-valid structured result object extracted for this recipient using `recipient_result_schema`.
+             *
+             *     `null` means CALL-E could not produce a schema-valid result for this recipient from the terminal call evidence, or no `recipient_result_schema` was provided.
+             */
             structured_result: {
                 [key: string]: unknown;
             } | null;
@@ -215,7 +517,11 @@ export interface components {
             task: string;
             /** @description Recipient states for this call task. */
             recipients: components["schemas"]["CallTaskRecipient"][];
-            /** @description Schema-valid structured result object extracted for the whole call task. `null` when no usable structured result object was produced. */
+            /**
+             * @description Schema-valid structured result object extracted for the whole call task using `result_schema`.
+             *
+             *     `null` means CALL-E could not produce a schema-valid task-level result from the terminal call evidence, or no `result_schema` was provided. Check recipient-level `structured_result` when you use `recipient_result_schema` for batch calls.
+             */
             structured_result: {
                 [key: string]: unknown;
             } | null;
@@ -242,7 +548,7 @@ export interface components {
             created_at: string;
             /**
              * Format: date-time
-             * @description ISO 8601 timestamp when the call reached a terminal state. `null` while queued or in progress.
+             * @description ISO 8601 timestamp when the complete terminal call result was published. `null` while queued or in progress.
              */
             completed_at: string | null;
         };
@@ -302,7 +608,7 @@ export interface components {
             /** @description Terminal call task snapshot associated with the webhook event. */
             data: components["schemas"]["WebhookCallData"];
         };
-        /** @description Terminal call task state included in webhook events. This shape is the same stable `call_task` object returned by the calls API. */
+        /** @description Complete terminal call task state included in webhook events. This shape is the same stable `call_task` object returned by the calls API after post-call outcome and requested structured-result finalization. */
         WebhookCallData: components["schemas"]["CallTask"];
         /** @description Example acknowledgement response from your webhook receiver. CALL-E treats any 2xx response as delivered and ignores the response body. */
         WebhookAcknowledgement: {
@@ -316,7 +622,7 @@ export interface components {
         };
         APIError: {
             /** @enum {string} */
-            code: "invalid_request" | "unauthorized" | "forbidden" | "rate_limit_exceeded" | "insufficient_balance" | "unsupported_region" | "unsupported_language" | "recipient_blocked" | "policy_violation" | "call_not_ready" | "no_recipients" | "invalid_recipient" | "invalid_phone" | "result_schema_invalid" | "recipient_result_schema_invalid" | "idempotency_conflict" | "provider_unavailable" | "internal_error" | "not_found";
+            code: "invalid_request" | "unauthorized" | "forbidden" | "rate_limit_exceeded" | "insufficient_balance" | "unsupported_region" | "unsupported_language" | "recipient_blocked" | "policy_violation" | "call_not_ready" | "no_recipients" | "invalid_recipient" | "invalid_phone" | "result_schema_invalid" | "recipient_result_schema_invalid" | "idempotency_conflict" | "goal_not_published" | "goal_not_executable" | "goal_not_ready" | "schema_override_not_allowed" | "variables_invalid" | "provider_unavailable" | "internal_error" | "not_found";
             message: string;
             details: {
                 [key: string]: unknown;
@@ -327,6 +633,8 @@ export interface components {
         /** @description Stable API error. */
         ErrorResponse: {
             headers: {
+                /** @description Prevent storage of owner-scoped API error details. */
+                "Cache-Control"?: "no-store";
                 [name: string]: unknown;
             };
             content: {
@@ -337,6 +645,44 @@ export interface components {
     parameters: {
         /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. */
         IdempotencyKey: string;
+        /**
+         * @description Required business-stable identity for one logical Goal Run, scoped to the authenticated
+         *     owner and `goal_id`. Derive it from a durable workflow event, for example
+         *     `delivery:ORD-8472:confirm-window:v1`, and persist it before sending the request.
+         *
+         *     Retry a timeout with the same key and byte-equivalent logical input. An exact replay returns
+         *     the original Goal Run with `201`; changing the phone or variables while reusing the key
+         *     returns `409 idempotency_conflict`. Do not generate a new random key for each network retry.
+         * @example delivery:ORD-8472:confirm-window:v1
+         */
+        GoalRunIdempotencyKey: string;
+        /**
+         * @description Maximum number of Goal interfaces in this page. Defaults to `20`; values below `1` or above
+         *     `100` return `400 invalid_request`. A page can contain fewer items even when the limit is
+         *     larger. Continue only when `next_cursor` is non-null.
+         * @example 20
+         */
+        GoalListLimit: number;
+        /**
+         * @description Opaque cursor returned as `next_cursor` by the immediately preceding list response. Pass it
+         *     unchanged together with the desired `limit`. Do not decode it, construct it from a Goal id,
+         *     or persist assumptions about its format. Omit this parameter for the first page.
+         * @example goalcur_Z29hbF9kZWxpdmVyeV9jb25maXJtYXRpb24
+         */
+        GoalListAfter: string;
+        /**
+         * @description Opaque public Goal identity returned by CALL-E Chat publish success or `GET /v1/goals`.
+         *     Store it with your integration configuration. It identifies the reusable Goal and is
+         *     different from `published_run_spec.id`, `goal_run_id`, and the nested telephone `run_id`.
+         * @example goal_delivery_confirmation
+         */
+        GoalId: string;
+        /**
+         * @description Opaque `GoalRun.id` returned by `POST /v1/goals/{goal_id}/runs`. Use it together with the
+         *     same `goal_id` when polling. Do not substitute the nested telephone `run_id`.
+         * @example rgrp_delivery_ord_8472
+         */
+        GoalRunId: string;
         /** @description Public CALL-E call identifier returned by create call. It starts with `call_` and is safe to store in your workflow records. */
         CallId: string;
         /**
@@ -344,16 +690,6 @@ export interface components {
          * @example evt_123
          */
         WebhookEventId: string;
-        /**
-         * @description Unix timestamp used in the signed payload. Verify this header together with `CALL-E-Signature` before parsing JSON.
-         * @example 1780309260
-         */
-        WebhookTimestamp: string;
-        /**
-         * @description HMAC SHA-256 signature in the form `v1=<hex digest>`, computed over `timestamp + "." + raw_body` with your webhook secret.
-         * @example v1=4d967f8f2b85f9c7d7f7ad1b9f8c5e3a5f1c2d3e4f5061728394050607080910
-         */
-        WebhookSignature: string;
     };
     requestBodies: never;
     headers: never;
@@ -456,6 +792,193 @@ export interface operations {
             500: components["responses"]["ErrorResponse"];
         };
     };
+    listGoals: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Maximum number of Goal interfaces in this page. Defaults to `20`; values below `1` or above
+                 *     `100` return `400 invalid_request`. A page can contain fewer items even when the limit is
+                 *     larger. Continue only when `next_cursor` is non-null.
+                 * @example 20
+                 */
+                limit?: components["parameters"]["GoalListLimit"];
+                /**
+                 * @description Opaque cursor returned as `next_cursor` by the immediately preceding list response. Pass it
+                 *     unchanged together with the desired `limit`. Do not decode it, construct it from a Goal id,
+                 *     or persist assumptions about its format. Omit this parameter for the first page.
+                 * @example goalcur_Z29hbF9kZWxpdmVyeV9jb25maXJtYXRpb24
+                 */
+                after?: components["parameters"]["GoalListAfter"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page of executable published Goal interfaces. */
+            200: {
+                headers: {
+                    /** @description Prevent storage of owner-scoped Goal data. */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalList"];
+                };
+            };
+            400: components["responses"]["ErrorResponse"];
+            401: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            429: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+        };
+    };
+    getGoal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Opaque public Goal identity returned by CALL-E Chat publish success or `GET /v1/goals`.
+                 *     Store it with your integration configuration. It identifies the reusable Goal and is
+                 *     different from `published_run_spec.id`, `goal_run_id`, and the nested telephone `run_id`.
+                 * @example goal_delivery_confirmation
+                 */
+                goal_id: components["parameters"]["GoalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active Goal and its currently published RunSpec interface. */
+            200: {
+                headers: {
+                    /** @description Prevent storage of owner-scoped Goal data. */
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goal"];
+                };
+            };
+            401: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            429: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+            502: components["responses"]["ErrorResponse"];
+            503: components["responses"]["ErrorResponse"];
+        };
+    };
+    createGoalRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Required business-stable identity for one logical Goal Run, scoped to the authenticated
+                 *     owner and `goal_id`. Derive it from a durable workflow event, for example
+                 *     `delivery:ORD-8472:confirm-window:v1`, and persist it before sending the request.
+                 *
+                 *     Retry a timeout with the same key and byte-equivalent logical input. An exact replay returns
+                 *     the original Goal Run with `201`; changing the phone or variables while reusing the key
+                 *     returns `409 idempotency_conflict`. Do not generate a new random key for each network retry.
+                 * @example delivery:ORD-8472:confirm-window:v1
+                 */
+                "Idempotency-Key": components["parameters"]["GoalRunIdempotencyKey"];
+            };
+            path: {
+                /**
+                 * @description Opaque public Goal identity returned by CALL-E Chat publish success or `GET /v1/goals`.
+                 *     Store it with your integration configuration. It identifies the reusable Goal and is
+                 *     different from `published_run_spec.id`, `goal_run_id`, and the nested telephone `run_id`.
+                 * @example goal_delivery_confirmation
+                 */
+                goal_id: components["parameters"]["GoalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateGoalRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Goal Run durably accepted, or the current projection of an exact idempotent replay. */
+            201: {
+                headers: {
+                    /** @description Prevent storage of owner-scoped Goal Run data. */
+                    "Cache-Control"?: "no-store";
+                    /** @description Relative URL of the Goal Run resource. */
+                    Location?: string;
+                    /** @description Suggested number of seconds before polling the execution. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalRun"];
+                };
+            };
+            400: components["responses"]["ErrorResponse"];
+            401: components["responses"]["ErrorResponse"];
+            402: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            422: components["responses"]["ErrorResponse"];
+            429: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+            502: components["responses"]["ErrorResponse"];
+            503: components["responses"]["ErrorResponse"];
+        };
+    };
+    getGoalRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Opaque public Goal identity returned by CALL-E Chat publish success or `GET /v1/goals`.
+                 *     Store it with your integration configuration. It identifies the reusable Goal and is
+                 *     different from `published_run_spec.id`, `goal_run_id`, and the nested telephone `run_id`.
+                 * @example goal_delivery_confirmation
+                 */
+                goal_id: components["parameters"]["GoalId"];
+                /**
+                 * @description Opaque `GoalRun.id` returned by `POST /v1/goals/{goal_id}/runs`. Use it together with the
+                 *     same `goal_id` when polling. Do not substitute the nested telephone `run_id`.
+                 * @example rgrp_delivery_ord_8472
+                 */
+                goal_run_id: components["parameters"]["GoalRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current Goal Run execution and result state. */
+            200: {
+                headers: {
+                    /** @description Prevent storage of owner-scoped Goal Run data. */
+                    "Cache-Control"?: "no-store";
+                    /** @description Suggested number of seconds before polling again when results are pending. */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalRun"];
+                };
+            };
+            401: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            429: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+            502: components["responses"]["ErrorResponse"];
+            503: components["responses"]["ErrorResponse"];
+        };
+    };
     receiveWebhookEvent: {
         parameters: {
             query?: never;
@@ -465,16 +988,6 @@ export interface operations {
                  * @example evt_123
                  */
                 "CALL-E-Event-Id": components["parameters"]["WebhookEventId"];
-                /**
-                 * @description Unix timestamp used in the signed payload. Verify this header together with `CALL-E-Signature` before parsing JSON.
-                 * @example 1780309260
-                 */
-                "CALL-E-Timestamp": components["parameters"]["WebhookTimestamp"];
-                /**
-                 * @description HMAC SHA-256 signature in the form `v1=<hex digest>`, computed over `timestamp + "." + raw_body` with your webhook secret.
-                 * @example v1=4d967f8f2b85f9c7d7f7ad1b9f8c5e3a5f1c2d3e4f5061728394050607080910
-                 */
-                "CALL-E-Signature": components["parameters"]["WebhookSignature"];
             };
             path?: never;
             cookie?: never;
@@ -494,7 +1007,7 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookAcknowledgement"];
                 };
             };
-            /** @description Webhook rejected because the payload or signature was invalid. */
+            /** @description Webhook rejected because the payload was invalid. */
             400: {
                 headers: {
                     [name: string]: unknown;
