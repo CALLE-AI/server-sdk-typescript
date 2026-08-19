@@ -24,7 +24,7 @@ pnpm add @call-e/calle
 Pin the current stable release when your deployment process requires exact package reproducibility:
 
 ```bash
-pnpm add @call-e/calle@0.6.0
+pnpm add @call-e/calle@0.7.0
 ```
 
 Use a local checkout for development and package smoke tests:
@@ -135,6 +135,7 @@ const run = await client.goals.runAndWait({
 });
 
 if (run.result !== null) {
+  console.log(run.callId);
   console.log(run.result);
 } else {
   console.error(run.error);
@@ -144,7 +145,7 @@ if (run.result !== null) {
 Run the same published Goal through the CLI:
 
 ```bash
-npx @call-e/calle@0.6.0 goals run \
+npx @call-e/calle@0.7.0 goals run \
   --goal-id "goal_delivery_confirmation" \
   --phone "+14155550100" \
   --variables '{"customer_name":"Taylor","order_reference":"ORD-8472","delivery_window":"July 24, 2:00-4:00 PM"}' \
@@ -222,7 +223,7 @@ pnpm add @call-e/calle
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
 ```
 
-The current stable version is `0.6.0`. Do not reuse a previously published npm
+The current stable version is `0.7.0`. Do not reuse a previously published npm
 version.
 
 ## Project Documents

@@ -31,7 +31,7 @@ function parameterRefs(path, method) {
 
 assertContract(spec.openapi === "3.1.0", "expected OpenAPI 3.1.0");
 assertContract(spec.info?.title === "CALL-E Developer API", "unexpected title");
-assertContract(spec.info?.version === "0.6.0", "unexpected API version");
+assertContract(spec.info?.version === "0.7.0", "unexpected API version");
 
 const requiredOperations = [
   {
@@ -62,7 +62,7 @@ const requiredOperations = [
     method: "get",
     operationId: "listGoals",
     responseSchema: "#/components/schemas/GoalList",
-    errorStatuses: ["400", "401", "403", "409", "429", "500"],
+    errorStatuses: ["400", "401", "403", "429", "500"],
   },
   {
     path: "/v1/goals/{goal_id}",
@@ -251,6 +251,7 @@ for (const property of [
   "id",
   "goal_id",
   "run_id",
+  "call_id",
   "run_spec",
   "status",
   "result",
@@ -260,6 +261,11 @@ for (const property of [
 ]) {
   assertContract(goalRunProperties[property], `GoalRun missing ${property}`);
 }
+assertContract(
+  JSON.stringify(goalRunProperties.call_id?.type?.slice().sort()) ===
+    JSON.stringify(["null", "string"]),
+  "GoalRun.call_id must be nullable string",
+);
 
 const goalRunParameterRefs = parameterRefs("/v1/goals/{goal_id}/runs", "post");
 assertContract(

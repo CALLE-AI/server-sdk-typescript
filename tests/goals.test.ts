@@ -35,6 +35,7 @@ const queuedRun = {
   id: "rgrp_delivery_8472",
   goal_id: "goal_delivery",
   run_id: "run_delivery_8472",
+  call_id: null,
   run_spec: { id: "rspec_delivery_v4", version: 4 },
   status: "queued",
   result: null,
@@ -114,6 +115,7 @@ describe("CalleClient goals", () => {
       id: "rgrp_delivery_8472",
       goalId: "goal_delivery",
       runId: "run_delivery_8472",
+      callId: null,
       status: "queued",
       runSpec: { id: "rspec_delivery_v4", version: 4 }
     });
@@ -127,6 +129,7 @@ describe("CalleClient goals", () => {
     };
     const succeeded = {
       ...materializing,
+      call_id: "calling_call_delivery_8472",
       result: { delivery_outcome: "confirmed" }
     };
     const fetchMock = vi
@@ -141,6 +144,7 @@ describe("CalleClient goals", () => {
     });
 
     expect(run.result).toEqual({ delivery_outcome: "confirmed" });
+    expect(run.callId).toBe("calling_call_delivery_8472");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
