@@ -58,6 +58,7 @@ const completedGoalRun: GoalRun = {
   id: "rgrp_delivery_8472",
   goalId: "goal_delivery",
   runId: "run_delivery_8472",
+  callId: "calling_call_delivery_8472",
   runSpec: { id: "rspec_delivery_v4", version: 4 },
   status: "completed",
   result: {

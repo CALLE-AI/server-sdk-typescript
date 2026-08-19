@@ -52,6 +52,7 @@ export interface GoalRun {
   id: string;
   goalId: string;
   runId: string;
+  callId: string | null;
   runSpec: GoalRunSpec;
   status: GoalRunStatus;
   result: GoalResult | null;
@@ -107,6 +108,7 @@ function fromApiGoalRun(run: ApiGoalRun): GoalRun {
     id: run.id,
     goalId: run.goal_id,
     runId: run.run_id,
+    callId: run.call_id,
     runSpec: run.run_spec,
     status: run.status,
     result: run.result,

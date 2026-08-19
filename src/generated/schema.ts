@@ -81,6 +81,8 @@ export interface paths {
          *     `after` value; clients must not parse or construct cursor values. `title` and `description`
          *     help operators recognize each published workflow, but integrations should still store the
          *     intended `goal_id` at publish time and must not execute the first list item blindly.
+         *     Candidates whose published RunSpec is not execution-ready are omitted without preventing
+         *     later executable Goals from appearing in the page.
          */
         get: operations["listGoals"];
         put?: never;
@@ -317,6 +319,13 @@ export interface components {
             goal_id: string;
             /** @description Internal execution member exposed for correlation; do not use it in the Goal Run polling path. */
             run_id: string;
+            /**
+             * @description Calling call identifier selected for this Goal Run when that trusted fact is available,
+             *     or `null` before a call identifier is persisted or when no identifier is available. This
+             *     is different from the Goal Run `id` and nested `run_id`; it does not expose other provider
+             *     diagnostics and must not be treated as an independent answered-call boolean.
+             */
+            call_id: string | null;
             /** @description Read-only identity and version of the exact RunSpec pinned by this Run. */
             run_spec: components["schemas"]["GoalRunSpecSnapshot"];
             status: components["schemas"]["GoalRunStatus"];
@@ -830,7 +839,6 @@ export interface operations {
             400: components["responses"]["ErrorResponse"];
             401: components["responses"]["ErrorResponse"];
             403: components["responses"]["ErrorResponse"];
-            409: components["responses"]["ErrorResponse"];
             429: components["responses"]["ErrorResponse"];
             500: components["responses"]["ErrorResponse"];
         };
