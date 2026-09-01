@@ -13,31 +13,86 @@ on:
           - remove
           - add
       tag:
-        description: npm dist-tag.
-        required: true
-        default: beta
-      version:
-        description: Package version. Required when action is add.
+        description: npm dist-tag. Required for add and remove.
         required: false
+      version:
+        description: Exact package version. Required for add only.
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manage-npm-dist-tags
+  cancel-in-progress: false
 
 jobs:
   manage:
     runs-on: ubuntu-latest
     environment: npm
+    env:
+      PACKAGE_NAME: "@call-e/calle"
+      INPUT_ACTION: ${{ inputs.action }}
+      INPUT_TAG: ${{ inputs.tag }}
+      INPUT_VERSION: ${{ inputs.version }}
 
     steps:
+      - name: Require main and validate inputs
+        env:
+          WORKFLOW_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$WORKFLOW_REF" != "refs/heads/main" ]]; then
+            echo "::error::Run this workflow from the main branch."
+            exit 1
+          fi
+          if [[ ! "$INPUT_ACTION" =~ ^(list|add|remove)$ ]]; then
+            echo "::error::action must be list, add, or remove."
+            exit 1
+          fi
+
+          if [[ "$INPUT_ACTION" == "list" ]]; then
+            if [[ -n "$INPUT_TAG" || -n "$INPUT_VERSION" ]]; then
+              echo "::error::tag and version must be empty when action is list."
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [[ ! "$INPUT_TAG" =~ ^[a-z][a-z0-9._-]{0,31}$ ]]; then
+            echo "::error::tag must be a lowercase npm dist-tag with at most 32 characters."
+            exit 1
+          fi
+
+          if [[ "$INPUT_ACTION" == "remove" ]]; then
+            if [[ -n "$INPUT_VERSION" ]]; then
+              echo "::error::version must be empty when action is remove."
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [[ ! "$INPUT_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "::error::version must be an exact semantic version without a leading v."
+            exit 1
+          fi
+
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "22.14.0"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
       - name: Configure npm token
+        if: inputs.action != 'list'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
 
-          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
             echo "::error::Missing GitHub Actions secret NPM_TOKEN."
             exit 1
           fi
@@ -48,19 +103,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ inputs.action }}" = "list" ]; then
-            npm dist-tag ls @call-e/calle
-          elif [ "${{ inputs.action }}" = "remove" ]; then
-            npm dist-tag rm @call-e/calle "${{ inputs.tag }}"
-          else
-            if [ -z "${{ inputs.version }}" ]; then
-              echo "::error::version is required when action is add."
-              exit 1
-            fi
-
-            npm dist-tag add "@call-e/calle@${{ inputs.version }}" "${{ inputs.tag }}"
-          fi
-
-          if [ "${{ inputs.action }}" != "list" ]; then
-            npm dist-tag ls @call-e/calle
-          fi
+          case "$INPUT_ACTION" in
+            list)
+              npm dist-tag ls "$PACKAGE_NAME"
+              ;;
+            remove)
+              npm dist-tag rm "$PACKAGE_NAME" "$INPUT_TAG"
+              npm dist-tag ls "$PACKAGE_NAME"
+              ;;
+            add)
+              npm dist-tag add "${PACKAGE_NAME}@${INPUT_VERSION}" "$INPUT_TAG"
+              npm dist-tag ls "$PACKAGE_NAME"
+              ;;
+          esac

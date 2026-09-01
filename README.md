@@ -1,5 +1,9 @@
 # @call-e/calle
 
+[![npm version](https://img.shields.io/npm/v/%40call-e%2Fcalle)](https://www.npmjs.com/package/@call-e/calle)
+[![CI](https://github.com/CALLE-AI/server-sdk-typescript/actions/workflows/ci.yml/badge.svg)](https://github.com/CALLE-AI/server-sdk-typescript/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 TypeScript server SDK for the CALL-E Developer API.
 
 Use this SDK from backend services, workers, and other trusted server
@@ -12,6 +16,17 @@ environments. Do not expose CALL-E API keys in browser code.
 - API Reference: <https://docs.heycall-e.com/#/api-reference>
 - Webhooks: <https://docs.heycall-e.com/#/webhooks>
 - Changelog: <https://docs.heycall-e.com/#/changelog>
+- Python server SDK: <https://github.com/CALLE-AI/server-sdk-python>
+
+## SDK surface
+
+- `client.calls` creates, reads, and polls call tasks and lists call events.
+- `client.goals` lists and reads published Goals and runs them with typed
+  results.
+- The `calle` CLI supports common Calls and Goals workflows from scripts and
+  terminals.
+- `examples/webhook-server.ts` shows how to receive current terminal webhook
+  events.
 
 ## Install
 
@@ -21,18 +36,26 @@ Install the stable package from npm:
 pnpm add @call-e/calle
 ```
 
-Pin the current stable release when your deployment process requires exact package reproducibility:
-
-```bash
-pnpm add @call-e/calle@0.7.0
-```
-
 Use a local checkout for development and package smoke tests:
 
 ```bash
 pnpm install
 pnpm run validate
 ```
+
+## Configuration
+
+Create one `CalleClient` and reuse it for Calls and Goals requests:
+
+| Option | Required | Description |
+| --- | --- | --- |
+| `apiKey` | Yes | CALL-E API key. Load it from a server-side secret store or environment variable. |
+| `baseUrl` | No | API base URL. Defaults to `https://api.heycall-e.com`. |
+| `fetch` | No | Fetch-compatible function for a custom transport or test harness. |
+
+Polling helpers accept interval and timeout options. See the method signatures
+in your editor and the [SDK guide](https://docs.heycall-e.com/#/sdks) for
+details.
 
 ## Examples
 
@@ -145,7 +168,7 @@ if (run.result !== null) {
 Run the same published Goal through the CLI:
 
 ```bash
-npx @call-e/calle@0.7.0 goals run \
+npx @call-e/calle@latest goals run \
   --goal-id "goal_delivery_confirmation" \
   --phone "+14155550100" \
   --variables '{"customer_name":"Taylor","order_reference":"ORD-8472","delivery_window":"July 24, 2:00-4:00 PM"}' \
@@ -197,37 +220,48 @@ console.log(call.taskCompleted, call.completionConfidence, call.evidence);
 console.log(call.recipients[0]?.structuredResult);
 ```
 
+## Error handling
+
+The SDK exports typed errors for API responses, authentication, rate limits,
+timeouts, and connection failures:
+
+```ts
+import { CalleAPIError, CalleClient } from "@call-e/calle";
+
+const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY! });
+
+try {
+  await client.calls.get("call_123");
+} catch (error) {
+  if (error instanceof CalleAPIError) {
+    console.error(error.status, error.code, error.details);
+  }
+  throw error;
+}
+```
+
 ## Release
 
 This repository publishes the npm package `@call-e/calle`.
 
-See [RELEASE.md](./RELEASE.md) for the release checklist, GitHub Actions
-workflow, and post-publish install smoke test.
+Merging to `main` runs CI and does not publish the package. Publishing a GitHub
+Release with a matching `vX.Y.Z` tag starts the npm release workflow. Manual
+workflow runs are dry runs only. See [RELEASE.md](./RELEASE.md) for release
+gates and registry checks.
 
-Prerequisites:
+## Support and security
 
-- Create an npm automation token or granular access token that can publish
-  `@call-e/calle`.
-- Add it to this repository as the GitHub Actions secret `NPM_TOKEN`.
-- Keep the package version in `package.json` unique before each publish.
-
-Manual stable publish:
-
-1. Confirm `package.json` has a unique stable version.
-2. Open the `Publish npm package` GitHub Actions workflow.
-3. Run it from `main` with tag `latest`.
-4. Verify install in a temporary project:
-
-```bash
-pnpm add @call-e/calle
-node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
-```
-
-The current stable version is `0.7.0`. Do not reuse a previously published npm
-version.
+Use [GitHub Issues](https://github.com/CALLE-AI/server-sdk-typescript/issues)
+for reproducible SDK bugs and feature requests. Do not report vulnerabilities
+in a public issue. Follow [SECURITY.md](./SECURITY.md) for private reporting.
 
 ## Project Documents
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [CHANGELOG.md](./CHANGELOG.md)
 - [SECURITY.md](./SECURITY.md)
 - [RELEASE.md](./RELEASE.md)
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
