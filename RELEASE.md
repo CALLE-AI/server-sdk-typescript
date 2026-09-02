@@ -1,41 +1,66 @@
 # Release
 
 This repository publishes the TypeScript server SDK package `@call-e/calle`.
+Merging to `main` never publishes the package.
 
-## Current status
+## Release identities and protection
 
-The first beta is published to npm:
+Package publishing uses npm Trusted Publishing from the `publish-npm.yml`
+workflow. Configure the trusted publisher on npm with:
 
-```text
-@call-e/calle@0.1.0-beta.1
-```
+- Owner: `CALLE-AI`
+- Repository: `server-sdk-typescript`
+- Workflow filename: `publish-npm.yml`
+- Environment name: `npm`
+- Allowed action: `npm publish`
 
-The current stable release version is:
-
-```text
-@call-e/calle@0.7.0
-```
-
-Release publishing requires one of these release identities:
-
-- GitHub Actions secret `NPM_TOKEN`, or
-- npm Trusted Publishing configured for this repository and workflow.
+The GitHub `npm` environment should require maintainer approval and restrict
+deployments to protected release tags. The publish job uses OIDC and does not
+read a long-lived npm token. `NPM_TOKEN` is retained only for the separate,
+manually invoked dist-tag management workflow.
 
 ## Release gates
 
-Run these checks before publishing:
+Run the full local check before opening the version PR:
 
 ```bash
 pnpm install
 pnpm run validate
 ```
 
-The CI workflow runs the same package checks on `main`.
+`validate` checks the OpenAPI contract, tests, types, examples, public-repository
+hygiene, the built package, and an install from the single generated tarball.
+It also verifies that the tarball includes `LICENSE`.
+
+For a stable release:
+
+1. Set a new, unpublished stable version in `package.json`. Do not reuse a
+   version because npm package versions are immutable.
+2. Move user-facing entries from `Unreleased` into a versioned section in
+   `CHANGELOG.md` when there are entries to release.
+3. Merge the version PR to `main` after CI passes.
+4. Optionally run `Publish npm package` manually against the intended commit.
+   A manual run validates, packs, uploads the checked artifact, and executes
+   `npm publish --dry-run`; it cannot publish.
+5. Create a `vX.Y.Z` tag at the release commit on `main`, then publish the
+   corresponding GitHub Release.
+
+The release workflow rejects prereleases, tags that do not exactly match the
+`package.json` version, and tag commits that are not contained in `origin/main`.
+Before dependency installation and again immediately before publication, it
+checks npm for the exact version. Only an explicit not-found response is
+treated as an available version; registry, network, and permission failures
+stop the release.
+
+The build job validates and packs once, then uploads exactly one tarball and a
+SHA-256 manifest. After environment approval, the publish job downloads that
+artifact and rechecks its file set, checksum, package version, and MIT license
+before publishing it with the `latest` dist-tag.
 
 ## Test API Goal smoke
 
-Before publishing a release that changes Goal behavior, run the local release
-candidate against a published Goal in the test environment:
+Before releasing a change to Goal behavior, run the local release candidate
+against a published Goal in the test environment:
 
 ```bash
 export CALLE_API_KEY="<TEST_API_KEY>"
@@ -52,61 +77,48 @@ new idempotency key for a new logical test. Reuse the same key only when
 retrying that exact request. Record the returned Goal Run id and verify that
 exactly one of `result` or `error` is non-null.
 
-## Stable npm publish
+## Post-publish verification
 
-1. Confirm `package.json` has a unique stable version.
-2. Confirm GitHub Actions secret `NPM_TOKEN` is configured, unless the package has been moved to npm Trusted Publishing.
-3. Open the `Publish npm package` workflow in GitHub Actions.
-4. Run the workflow from `main` with tag `latest` and the selected release identity.
-5. Confirm the workflow completes the post-publish install smoke test.
+The workflow waits for exact-version registry metadata, installs the published
+package in a temporary project, imports `CalleClient`, and runs the packaged
+CLI help command.
+
+A failure in either post-publish check does not mean publication failed. If the
+`npm publish` step succeeded, do not retry the same version. Check the registry
+state and investigate the verification failure first.
 
 Manual verification:
 
 ```bash
-npm view @call-e/calle dist-tags version
+VERSION="$(node -p "require('./package.json').version")"
+npm view "@call-e/calle@${VERSION}" version dist-tags
 
 tmpdir="$(mktemp -d)"
 cd "$tmpdir"
 npm init -y
-npm install @call-e/calle@0.7.0
+npm install "@call-e/calle@${VERSION}"
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; const client = new CalleClient({ apiKey: "smoke" }); console.log(typeof client.goals.runAndWait)'
 ```
 
 ## Dist-tags
 
-The stable package should be available through the `latest` dist-tag.
+Use the `Manage npm dist-tags` workflow only when a published version needs an
+explicit tag correction. Run it from `main`. `add` requires an exact semantic
+version and a validated lowercase tag; `remove` requires a tag; `list` accepts
+neither. Mutating actions require the `NPM_TOKEN` repository secret and the
+`npm` environment.
 
-If `latest` still points to an older version after the stable publish, correct it only after confirming `0.7.0` is visible:
-
-```bash
-npm dist-tag add @call-e/calle@0.7.0 latest
-npm dist-tag ls @call-e/calle
-```
-
-Keep the `beta` dist-tag for prerelease versions. Do not move `beta` to a stable version.
-
-Do not reuse a previously published version. npm package versions are immutable.
+Keep `latest` on the intended stable version. Reserve `beta` for prerelease
+versions and do not move it to a stable version.
 
 ## Version rules
 
-- Patch releases fix SDK wrapper bugs, type issues, packaging metadata, README examples, or distribution issues without changing public API behavior.
+- Patch releases fix SDK wrapper bugs, type issues, packaging metadata, README
+  examples, or distribution issues without changing public API behavior.
 - Minor releases add backward-compatible API fields, endpoints, or SDK helpers.
-- Major releases make breaking public API, method signature, stable error, or webhook signature contract changes.
+- Major releases make breaking public API, method signature, stable error, or
+  webhook signature contract changes.
 
-Keep TypeScript, Python, OpenAPI, and public docs versions aligned by default. A single-language patch is allowed only when the shared API contract and cross-language behavior do not change.
-
-## Registry identity notes
-
-Token-based publishing requires an npm automation token or granular access token with publish access for `@call-e/calle`.
-
-npm Trusted Publishing is preferred once the repository is ready for public release. The workflow uses a GitHub-hosted runner, Node.js 22.14.0, and upgrades npm to 11.5.1 or newer when auth `trusted-publishing` is selected.
-
-Configure the trusted publisher on npm for:
-
-- Owner: `CALLE-AI`
-- Repository: `server-sdk-typescript`
-- Workflow filename: `publish-npm.yml`
-- Environment name: `npm`
-- Permission: allow `npm publish`
-
-When using Trusted Publishing, run the workflow with auth `trusted-publishing`. When using an npm token, run it with auth `token` and configure the GitHub Actions secret `NPM_TOKEN`.
+Keep TypeScript, Python, OpenAPI, and public docs behavior aligned by default. A
+single-language patch is appropriate only when the shared API contract and
+cross-language behavior do not change.

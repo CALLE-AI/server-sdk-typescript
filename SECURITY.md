@@ -7,8 +7,9 @@ Security fixes are applied to the current stable release line.
 ## Reporting a vulnerability
 
 Do not open a public issue for suspected vulnerabilities. Use GitHub private
-vulnerability reporting if it is enabled for this repository; otherwise contact
-the CALL-E maintainers directly.
+vulnerability reporting if it is enabled for this repository, or email
+[support@heycall-e.com](mailto:support@heycall-e.com?subject=Security%20report)
+with the subject `Security report`.
 
 Send a private report to the CALL-E maintainers with:
 
