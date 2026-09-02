@@ -11,7 +11,7 @@ pnpm run validate
 ```
 
 The validation command runs the tests and type checks, scans tracked files for
-public-repository hygiene issues, builds the package once, and smoke-tests the
+public-repository hygiene issues, builds the package, and smoke-tests the
 generated tarball. The tarball is ignored by Git.
 
 ## Local examples
