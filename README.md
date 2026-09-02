@@ -223,7 +223,7 @@ console.log(call.recipients[0]?.structuredResult);
 ## Error handling
 
 The SDK exports typed errors for API responses, authentication, rate limits,
-timeouts, and connection failures:
+polling timeouts, and missing response bodies:
 
 ```ts
 import { CalleAPIError, CalleClient } from "@call-e/calle";
