@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-npm-${{ github.event.release.tag_name || github.ref }}
+  group: npm-call-e-calle
   cancel-in-progress: false
 
 jobs:
@@ -89,6 +89,12 @@ jobs:
             echo "::error::Could not confirm the package identity with the npm registry."
             exit 1
           fi
+
+          if ! current_latest="$(npm view '@call-e/calle' dist-tags.latest --registry https://registry.npmjs.org 2>/dev/null)"; then
+            echo "::error::Could not read the current npm latest version."
+            exit 1
+          fi
+          node scripts/require-newer-stable-version.mjs "$package_version" "$current_latest"
 
           set +e
           version_lookup="$(npm view "@call-e/calle@${package_version}" version --registry https://registry.npmjs.org 2>&1)"
@@ -262,7 +268,9 @@ jobs:
           set -euo pipefail
 
           for attempt in {1..10}; do
-            if [[ "$(npm view "@call-e/calle@${PACKAGE_VERSION}" version 2>/dev/null || true)" == "$PACKAGE_VERSION" ]]; then
+            visible_version="$(npm view "@call-e/calle@${PACKAGE_VERSION}" version 2>/dev/null || true)"
+            latest_version="$(npm view '@call-e/calle' dist-tags.latest 2>/dev/null || true)"
+            if [[ "$visible_version" == "$PACKAGE_VERSION" && "$latest_version" == "$PACKAGE_VERSION" ]]; then
               exit 0
             fi
             echo "Published package metadata is not visible yet; retrying in 10 seconds."

@@ -76,7 +76,7 @@ pnpm run example:create-and-wait
 Run a published Goal and wait for its structured result:
 
 ```bash
-export CALLE_BASE_URL="https://test-api.heycall-e.com"
+export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_GOAL_ID="<PUBLISHED_GOAL_ID>"
 export CALLE_EXAMPLE_PHONE="<E164_PHONE>"
 export CALLE_GOAL_VARIABLES='{"name":"Alex"}'
@@ -123,7 +123,9 @@ event JSON without a webhook secret or signature headers. CALL-E sends the
 event only after the post-call outcome and requested structured results are
 finalized. Deduplicate side effects with the event `id` or
 `CALL-E-Event-Id`, and reject events when the required header does not match
-the body `id`.
+the body `id`. The example defaults to a 10 MiB request-body limit and returns
+`413` for larger payloads. Set `CALLE_WEBHOOK_MAX_BODY_BYTES` to match your
+provider and ingress limits.
 
 The `client.webhooks.verify` and signed `client.webhooks.unwrap` methods
 implement the legacy SDK `0.2` contract. They remain available for source
@@ -264,4 +266,6 @@ in a public issue. Follow [SECURITY.md](./SECURITY.md) for private reporting.
 
 ## License
 
-This project is licensed under the [MIT License](./LICENSE).
+This project is licensed under the [MIT License](./LICENSE). The same license
+applies to the published npm packages `@call-e/calle@0.6.0` and
+`@call-e/calle@0.7.0`.

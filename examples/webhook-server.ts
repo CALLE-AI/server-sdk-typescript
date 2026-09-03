@@ -3,7 +3,16 @@ import type { IncomingMessage } from "node:http";
 import type { WebhookEvent } from "../src/index.js";
 
 const port = Number(process.env.PORT ?? "3000");
+const maxRequestBodyBytes = Number(
+  process.env.CALLE_WEBHOOK_MAX_BODY_BYTES ?? "10485760"
+);
 const processedEventIds = new Set<string>();
+
+class RequestBodyTooLargeError extends Error {}
+
+if (!Number.isSafeInteger(maxRequestBodyBytes) || maxRequestBodyBytes <= 0) {
+  throw new Error("CALLE_WEBHOOK_MAX_BODY_BYTES must be a positive integer.");
+}
 
 const server = createServer(async (request, response) => {
   if (request.method !== "POST" || request.url !== "/calle/webhook") {
@@ -12,9 +21,8 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const rawBody = await readRequestBody(request);
-
   try {
+    const rawBody = await readRequestBody(request);
     const event = JSON.parse(rawBody.toString("utf8")) as WebhookEvent;
     const eventId = request.headers["call-e-event-id"];
     if (typeof eventId !== "string" || eventId !== event.id) {
@@ -52,9 +60,18 @@ const server = createServer(async (request, response) => {
 
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify({ received: true }));
-  } catch {
-    response.writeHead(400, { "content-type": "application/json" });
-    response.end(JSON.stringify({ error: "invalid_json" }));
+  } catch (error) {
+    if (response.destroyed) {
+      return;
+    }
+
+    const bodyTooLarge = error instanceof RequestBodyTooLargeError;
+    response.writeHead(bodyTooLarge ? 413 : 400, {
+      "content-type": "application/json"
+    });
+    response.end(
+      JSON.stringify({ error: bodyTooLarge ? "payload_too_large" : "invalid_json" })
+    );
   }
 });
 
@@ -64,8 +81,15 @@ server.listen(port, () => {
 
 async function readRequestBody(request: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const bodyChunk = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += bodyChunk.length;
+    if (totalBytes > maxRequestBodyBytes) {
+      throw new RequestBodyTooLargeError();
+    }
+    chunks.push(bodyChunk);
   }
-  return Buffer.concat(chunks);
+  return Buffer.concat(chunks, totalBytes);
 }

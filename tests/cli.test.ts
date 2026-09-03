@@ -123,7 +123,7 @@ describe("calle CLI", () => {
         "--api-key",
         "cli_key",
         "--base-url",
-        "https://test-api.heycall-e.com",
+        "https://api.example.test",
         "--idempotency-key",
         "idem_123",
         "--interval-ms",
@@ -141,7 +141,7 @@ describe("calle CLI", () => {
     expect(exitCode).toBe(0);
     expect(createClient).toHaveBeenCalledWith({
       apiKey: "cli_key",
-      baseUrl: "https://test-api.heycall-e.com"
+      baseUrl: "https://api.example.test"
     });
     expect(create).toHaveBeenCalledWith(
       {
