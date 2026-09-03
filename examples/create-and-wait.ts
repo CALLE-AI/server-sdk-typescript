@@ -10,9 +10,7 @@ const call = await client.calls.createAndWait(
     task: "Call each recipient and ask whether they can attend Friday lunch in San Francisco.",
     recipients: [
       {
-        phones: [process.env.CALLE_EXAMPLE_PHONE ?? "+14155550100"],
-        region: "US",
-        locale: "en-US"
+        phones: [process.env.CALLE_EXAMPLE_PHONE ?? "+14155550100"]
       }
     ],
     resultSchema: {
