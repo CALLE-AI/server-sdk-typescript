@@ -22,7 +22,7 @@ export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_EXAMPLE_PHONE="+14155550100"
 pnpm run example:create-and-wait
 
-export CALLE_BASE_URL="https://test-api.heycall-e.com"
+export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_GOAL_ID="<PUBLISHED_GOAL_ID>"
 export CALLE_EXAMPLE_PHONE="<E164_PHONE>"
 export CALLE_GOAL_VARIABLES='{"name":"Alex"}'

@@ -14,10 +14,10 @@ workflow. Configure the trusted publisher on npm with:
 - Environment name: `npm`
 - Allowed action: `npm publish`
 
-The GitHub `npm` environment should require maintainer approval and restrict
-deployments to protected release tags. The publish job uses OIDC and does not
-read a long-lived npm token. `NPM_TOKEN` is retained only for the separate,
-manually invoked dist-tag management workflow.
+The GitHub `npm` environment should require maintainer approval and allow
+deployments only from `main` and `v*` release tags. The publish job uses OIDC
+and does not read a long-lived npm token. `NPM_TOKEN` is retained only for the
+separate, manually invoked dist-tag management workflow.
 
 ## Release gates
 
@@ -46,11 +46,13 @@ For a stable release:
    corresponding GitHub Release.
 
 The release workflow rejects prereleases, tags that do not exactly match the
-`package.json` version, and tag commits that are not contained in `origin/main`.
-Before dependency installation and again immediately before publication, it
-checks npm for the exact version. Only an explicit not-found response is
-treated as an available version; registry, network, and permission failures
-stop the release.
+`package.json` version, tag commits that are not contained in `origin/main`,
+and versions that do not advance npm's current `latest` version. Before
+dependency installation and again immediately before publication, it checks
+npm for the exact version. Only an explicit not-found response is treated as
+an available version; registry, network, and permission failures stop the
+release. Package publication and manual dist-tag changes share one concurrency
+lock.
 
 The build job validates and packs once, then uploads exactly one tarball and a
 SHA-256 manifest. After environment approval, the publish job downloads that
@@ -64,7 +66,7 @@ against a published Goal in the test environment:
 
 ```bash
 export CALLE_API_KEY="<TEST_API_KEY>"
-export CALLE_BASE_URL="https://test-api.heycall-e.com"
+export CALLE_BASE_URL="<APPROVED_TEST_API_BASE_URL>"
 export CALLE_GOAL_ID="<PUBLISHED_TEST_GOAL_ID>"
 export CALLE_EXAMPLE_PHONE="<AUTHORIZED_TEST_E164_PHONE>"
 export CALLE_GOAL_VARIABLES='{"name":"Alex"}'
@@ -108,8 +110,8 @@ version and a validated lowercase tag; `remove` requires a tag; `list` accepts
 neither. Mutating actions require the `NPM_TOKEN` repository secret and the
 `npm` environment.
 
-Keep `latest` on the intended stable version. Reserve `beta` for prerelease
-versions and do not move it to a stable version.
+The workflow prevents removing `latest`, requires `latest` to target a stable
+version, and requires `beta` to target a prerelease version.
 
 ## Version rules
 

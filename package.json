@@ -42,8 +42,9 @@
     "test:package": "pnpm run build && node --input-type=module -e \"import('./dist/index.js').then((mod) => { const client = new mod.CalleClient({ apiKey: 'smoke' }); if (typeof client.goals?.runAndWait !== 'function') process.exit(1); })\"",
     "pack": "rm -f call-e-calle-*.tgz && npm pack --silent",
     "test:tarball": "pnpm run build && pnpm run pack && tarball=$(find . -maxdepth 1 -name 'call-e-calle-*.tgz' -print -quit) && test -n \"$tarball\" && tar -tzf \"$tarball\" | grep -qx 'package/LICENSE' && tarball=\"$(pwd)/${tarball#./}\" && smoke_dir=$(mktemp -d) && trap 'rm -rf \"$smoke_dir\"' EXIT && cd \"$smoke_dir\" && npm init -y >/dev/null && npm install \"$tarball\" >/dev/null && node --input-type=module -e \"import('@call-e/calle').then((mod) => { const client = new mod.CalleClient({ apiKey: 'smoke' }); if (typeof client.goals?.runAndWait !== 'function') process.exit(1); })\" && ./node_modules/.bin/calle --help | grep \"Usage:\" >/dev/null",
+    "test:release-version": "node scripts/require-newer-stable-version.mjs --self-test",
     "check:public-repo": "node scripts/check-public-repo-hygiene.mjs",
-    "validate": "pnpm run verify:openapi && pnpm run test && pnpm run typecheck && pnpm run typecheck:examples && pnpm run check:public-repo && pnpm run test:package && pnpm run test:tarball",
+    "validate": "pnpm run verify:openapi && pnpm run test && pnpm run typecheck && pnpm run typecheck:examples && pnpm run test:release-version && pnpm run check:public-repo && pnpm run test:package && pnpm run test:tarball",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "publishConfig": {

@@ -17,3 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Stable publishing is initiated by a versioned GitHub Release and uses npm
   Trusted Publishing.
+- npm publishing and dist-tag changes are serialized, and stable releases must
+  advance the current `latest` version.
+- The webhook receiver example bounds request bodies and safely handles
+  interrupted uploads.
