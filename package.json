@@ -1,6 +1,6 @@
 {
   "name": "@call-e/calle",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "TypeScript server SDK for the CALL-E Developer API.",
   "license": "MIT",
   "type": "module",
