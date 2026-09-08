@@ -41,7 +41,7 @@ const requiredOperations = [
     requestSchema: "#/components/schemas/CreateCallRequest",
     responseStatus: "201",
     responseSchema: "#/components/schemas/CallTask",
-    errorStatuses: ["400", "401", "403", "409", "422", "429", "500"],
+    errorStatuses: ["400", "401", "403", "409", "422", "429", "500", "503"],
   },
   {
     path: "/v1/calls/{call_id}",
@@ -118,7 +118,8 @@ for (const operation of requiredOperations) {
 
   for (const status of operation.errorStatuses) {
     assertContract(
-      endpoint.responses?.[status]?.$ref === "#/components/responses/ErrorResponse",
+      endpoint.responses?.[status]?.$ref === "#/components/responses/ErrorResponse" ||
+        endpoint.responses?.[status]?.content?.["application/json"]?.schema?.$ref === "#/components/schemas/ErrorEnvelope",
       `missing stable ${status} error response for ${operation.method.toUpperCase()} ${operation.path}`,
     );
   }

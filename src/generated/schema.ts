@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * Create Call
-         * @description Create an asynchronous call. Use `result_schema` and `recipient_result_schema` to ask CALL-E to extract structured JSON results from terminal call evidence.
+         * @description Create an asynchronous call. Use `result_schema` and `recipient_result_schema` to ask CALL-E to extract structured JSON results from terminal call evidence. Shared platform outbound lines support one phone number per task. Batch calls require an eligible purchased number selected as the account default outbound number; otherwise creation returns `422 call_not_ready`. Account concurrency and LLM token usage are controlled by the effective account configuration. Task concurrency defaults to 1 on shared platform lines and 10 on eligible dedicated purchased numbers; selecting a purchased number as the account default does not make it a shared platform line.
          */
         post: operations["createCall"];
         delete?: never;
@@ -378,7 +378,7 @@ export interface components {
         CreateCallRequest: {
             /** @description Natural-language instruction for the call task. Include the goal, relevant details the voice agent should know, and the exact information you want collected. */
             task: string;
-            /** @description Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use. */
+            /** @description Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use. The default outbound line permits one phone number in total across all recipients. Multiple targets require an eligible purchased outbound number; this also applies to targets inferred from task text. */
             recipients?: components["schemas"]["CallTaskRecipientRequest"][] | null;
             /**
              * @description Optional JSON Schema object that defines the structured result CALL-E should extract for the whole call task.
@@ -631,7 +631,7 @@ export interface components {
         };
         APIError: {
             /** @enum {string} */
-            code: "invalid_request" | "unauthorized" | "forbidden" | "rate_limit_exceeded" | "insufficient_balance" | "unsupported_region" | "unsupported_language" | "recipient_blocked" | "policy_violation" | "call_not_ready" | "no_recipients" | "invalid_recipient" | "invalid_phone" | "result_schema_invalid" | "recipient_result_schema_invalid" | "idempotency_conflict" | "goal_not_published" | "goal_not_executable" | "goal_not_ready" | "schema_override_not_allowed" | "variables_invalid" | "provider_unavailable" | "internal_error" | "not_found";
+            code: "invalid_request" | "unauthorized" | "forbidden" | "rate_limit_exceeded" | "account_concurrency_exceeded" | "account_concurrency_unavailable" | "llm_token_budget_exceeded" | "llm_token_budget_unavailable" | "insufficient_balance" | "unsupported_region" | "unsupported_language" | "recipient_blocked" | "policy_violation" | "call_not_ready" | "no_recipients" | "invalid_recipient" | "invalid_phone" | "result_schema_invalid" | "recipient_result_schema_invalid" | "idempotency_conflict" | "goal_not_published" | "goal_not_executable" | "goal_not_ready" | "schema_override_not_allowed" | "variables_invalid" | "provider_unavailable" | "internal_error" | "not_found";
             message: string;
             details: {
                 [key: string]: unknown;
@@ -652,7 +652,7 @@ export interface components {
         };
     };
     parameters: {
-        /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. */
+        /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. A persisted creation failure replays its original HTTP status and error body; use a new key for a new attempt after resolving the error. While creation is still in progress, a duplicate returns `409 idempotency_conflict` with `details.reason_code=creation_in_progress`. A different request using the same key returns `409 idempotency_conflict`. */
         IdempotencyKey: string;
         /**
          * @description Required business-stable identity for one logical Goal Run, scoped to the authenticated
@@ -710,7 +710,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. */
+                /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. A persisted creation failure replays its original HTTP status and error body; use a new key for a new attempt after resolving the error. While creation is still in progress, a duplicate returns `409 idempotency_conflict` with `details.reason_code=creation_in_progress`. A different request using the same key returns `409 idempotency_conflict`. */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path?: never;
@@ -736,8 +736,42 @@ export interface operations {
             403: components["responses"]["ErrorResponse"];
             409: components["responses"]["ErrorResponse"];
             422: components["responses"]["ErrorResponse"];
-            429: components["responses"]["ErrorResponse"];
+            /** @description An account concurrency limit (`account_concurrency_exceeded`), or LLM token budget (`llm_token_budget_exceeded`) was reached. Account admission is checked before planning. Concurrency errors identify the effective line type and limit. Shared-line errors include KYC and dedicated-number purchase guidance in the message and `details.upgrade`; purchased-line errors ask the user to wait for capacity without another purchase suggestion. Configured limits override the default 1 / 10 values. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "account_concurrency_exceeded",
+                     *         "message": "Your default shared line (such as us/all) is at its account concurrency limit of 1. This limit is shared across API, MCP, and Dashboard. Wait for an active task to finish, then retry. For up to 10 concurrent tasks, complete identity verification (KYC), purchase a dedicated phone number, and select the activated number as your default outbound number. [Verify identity and buy a number](https://dashboard.heycall-e.com/account/numbers/buy).",
+                     *         "details": {
+                     *           "line_type": "platform_default",
+                     *           "max_active_tasks": 1,
+                     *           "upgrade": {
+                     *             "max_active_tasks": 10,
+                     *             "kyc_required": true,
+                     *             "purchase_url": "https://dashboard.heycall-e.com/account/numbers/buy"
+                     *           }
+                     *         }
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             500: components["responses"]["ErrorResponse"];
+            /** @description The provider or an account control is unavailable (`provider_unavailable`, `account_concurrency_unavailable`, or `llm_token_budget_unavailable`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     getCall: {
