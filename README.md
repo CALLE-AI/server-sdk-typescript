@@ -60,7 +60,7 @@ details.
 ## API keys and diagnostic output
 
 Use the complete API key issued by the [CALL-E dashboard](https://dashboard.heycall-e.com/account/api-keys).
-`iams_live_example` and the fallback keys in example scripts are non-working
+`<YOUR_CALLE_API_KEY>` and the fallback keys in example scripts are non-working
 placeholders. Replace them with your own key; do not derive key validation or
 redaction patterns from a sample prefix.
 
@@ -94,7 +94,7 @@ before publishing it; these replacements are not a general-purpose PII filter.
 Set the API key before running call examples:
 
 ```bash
-export CALLE_API_KEY="iams_live_example"
+export CALLE_API_KEY="<YOUR_CALLE_API_KEY>"
 export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_EXAMPLE_PHONE="+14155550100"
 ```

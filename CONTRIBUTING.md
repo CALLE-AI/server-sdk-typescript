@@ -21,7 +21,7 @@ Replace the sample credentials with your own key before running. Read
 before sharing example output.
 
 ```bash
-export CALLE_API_KEY="iams_live_example"
+export CALLE_API_KEY="<YOUR_CALLE_API_KEY>"
 export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_EXAMPLE_PHONE="+14155550100"
 pnpm run example:create-and-wait
