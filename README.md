@@ -57,6 +57,38 @@ Polling helpers accept interval and timeout options. See the method signatures
 in your editor and the [SDK guide](https://docs.heycall-e.com/#/sdks) for
 details.
 
+## API keys and diagnostic output
+
+Use the complete API key issued by the [CALL-E dashboard](https://dashboard.heycall-e.com/account/api-keys).
+`iams_live_example` and the fallback keys in example scripts are non-working
+placeholders. Replace them with your own key; do not derive key validation or
+redaction patterns from a sample prefix.
+
+Before logging or sharing diagnostics:
+
+- Prefer a small set of fields such as SDK version, HTTP status, and error
+  code over dumping a full request, response, or error object.
+- Remove the entire `Authorization` header and configured secret values.
+  Matching one key prefix is not sufficient.
+- Review phone fields and free text, including `task`, transcripts, summaries,
+  evidence, custom results, metadata, and error details. The SDK preserves the
+  returned task text, which may contain a phone number or other private data.
+  Dashboard masking does not redact SDK output or raw API responses.
+
+For example, a manually redacted response excerpt for sharing can omit all
+other fields and replace both the task and recipient phone:
+
+```json
+{
+  "status": "completed",
+  "task": "[REDACTED]",
+  "recipients": [{"phones": ["[REDACTED]"]}]
+}
+```
+
+This is a diagnostic excerpt, not a create request. Inspect the final text
+before publishing it; these replacements are not a general-purpose PII filter.
+
 ## Examples
 
 Set the API key before running call examples:
