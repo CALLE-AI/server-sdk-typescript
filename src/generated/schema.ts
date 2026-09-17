@@ -4,6 +4,86 @@
  */
 
 export interface paths {
+    "/v2/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a single Agentic call
+         * @description Accept one phone for durable Agentic execution. Batch recipients, recurrence and recipient_result_schema are not accepted. The accepted request and result_schema are immutable. In this draft scheduled_at is reserved and non-null values return 422 scheduling_unavailable until renewable execution authorization is configured.
+         */
+        post: operations["createAgenticCall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/calls/{call_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a committed Agentic call result
+         * @description Polling reads persisted state and never performs extraction or initiates a call.
+         */
+        get: operations["getAgenticCall"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/calls/{call_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel before provider submission
+         * @description Cancellation is idempotent for terminal calls. Once provider submission starts, returns 409 call_cannot_cancel; it does not hang up an active call.
+         */
+        post: operations["cancelAgenticCall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/calls/{call_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List call lifecycle events
+         * @description Accepted, submission-started and terminal events, ordered chronologically. Internal Agentic events are not exposed. These stable lifecycle events can be polled with the returned cursor.
+         */
+        get: operations["listAgenticCallEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/calls": {
         parameters: {
             query?: never;
@@ -15,7 +95,7 @@ export interface paths {
         put?: never;
         /**
          * Create Call
-         * @description Create an asynchronous call. Use `result_schema` and `recipient_result_schema` to ask CALL-E to extract structured JSON results from terminal call evidence.
+         * @description Create an asynchronous call. Use `result_schema` and `recipient_result_schema` to ask CALL-E to extract structured JSON results from terminal call evidence. Shared platform outbound lines support one phone number per task. Batch calls require an eligible purchased number selected as the account default outbound number; otherwise creation returns `422 call_not_ready`. Account concurrency and LLM token usage are controlled by the effective account configuration. Task concurrency defaults to 1 on shared platform lines and 10 on eligible dedicated purchased numbers; selecting a purchased number as the account default does not make it a shared platform line.
          */
         post: operations["createCall"];
         delete?: never;
@@ -204,6 +284,65 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description One phone, explicit dialing locale and a required Goal-compatible result schema. */
+        CreateAgenticCallRequest: {
+            task: string;
+            phone: string;
+            region: string;
+            locale: string;
+            /** @description Required closed flat JSON Schema using the same calle.result.scalar-object.v1 profile as Goal. At most 32 string, boolean, integer or number properties; additionalProperties must be false. Nested objects, arrays, null values and schema combinators are unsupported. */
+            result_schema: {
+                [key: string]: unknown;
+            };
+            /** @description Reserved draft field. Non-null values currently return scheduling_unavailable; do not use until scheduled authorization is enabled. */
+            scheduled_at?: string | null;
+            metadata?: {
+                [key: string]: unknown;
+            };
+            webhook_url?: string | null;
+        };
+        /** @description Persisted one-shot snapshot with the same result/error contract as Goal Run. Continue polling while both are null, even when status is completed. An empty result object is ready. Execution completion does not imply business success. Terminal webhooks are sent after result or error is ready. */
+        AgenticCall: {
+            id: string;
+            /** @constant */
+            object: "call";
+            status: components["schemas"]["GoalRunStatus"];
+            task: string;
+            phone: string;
+            region: string;
+            locale: string;
+            scheduled_at: string | null;
+            /** @description Result validated against the submitted result_schema and durably persisted, or null while processing or on error. */
+            result: {
+                [key: string]: components["schemas"]["GoalScalar"];
+            } | null;
+            /**
+             * @description Unified execution or result-processing error, or `null`. Branch on `code`; keep `message`
+             *     for logs and operators. A non-null error is final and is mutually exclusive with `result`.
+             */
+            error: components["schemas"]["GoalRunError"] | null;
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description UTC telephone-execution completion time, or `null` while execution is non-terminal.
+             */
+            completed_at: string | null;
+        };
+        /** @description Terminal event for either a legacy v1 call task or an Agentic v2 call. Inspect data.object to distinguish the payload. */
+        TerminalWebhookEvent: components["schemas"]["WebhookEvent"] | components["schemas"]["AgenticWebhookEvent"];
+        /** @description v2 terminal webhook. data is identical to the terminal GET response. A valid call completion can carry a failed custom result. Retries reuse the same event id. */
+        AgenticWebhookEvent: {
+            id: string;
+            /** @enum {string} */
+            type: "call.completed" | "call.failed" | "call.canceled";
+            /** Format: date-time */
+            created_at: string;
+            data: components["schemas"]["AgenticCall"];
+        };
         /**
          * @description Cursor-paginated collection of the authenticated owner's listed, active, published Goal
          *     interfaces. Use this for discovery or recovery of a known Goal id, not as title search.
@@ -378,7 +517,7 @@ export interface components {
         CreateCallRequest: {
             /** @description Natural-language instruction for the call task. Include the goal, relevant details the voice agent should know, and the exact information you want collected. */
             task: string;
-            /** @description Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use. */
+            /** @description Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use. The default outbound line permits one phone number in total across all recipients. Multiple targets require an eligible purchased outbound number; this also applies to targets inferred from task text. */
             recipients?: components["schemas"]["CallTaskRecipientRequest"][] | null;
             /**
              * @description Optional JSON Schema object that defines the structured result CALL-E should extract for the whole call task.
@@ -631,7 +770,7 @@ export interface components {
         };
         APIError: {
             /** @enum {string} */
-            code: "invalid_request" | "unauthorized" | "forbidden" | "rate_limit_exceeded" | "insufficient_balance" | "unsupported_region" | "unsupported_language" | "recipient_blocked" | "policy_violation" | "call_not_ready" | "no_recipients" | "invalid_recipient" | "invalid_phone" | "result_schema_invalid" | "recipient_result_schema_invalid" | "idempotency_conflict" | "goal_not_published" | "goal_not_executable" | "goal_not_ready" | "schema_override_not_allowed" | "variables_invalid" | "provider_unavailable" | "internal_error" | "not_found";
+            code: "call_cannot_cancel" | "scheduling_unavailable" | "invalid_request" | "unauthorized" | "forbidden" | "rate_limit_exceeded" | "account_concurrency_exceeded" | "account_concurrency_unavailable" | "llm_token_budget_exceeded" | "llm_token_budget_unavailable" | "insufficient_balance" | "unsupported_region" | "unsupported_language" | "recipient_blocked" | "policy_violation" | "call_not_ready" | "no_recipients" | "invalid_recipient" | "invalid_phone" | "result_schema_invalid" | "recipient_result_schema_invalid" | "idempotency_conflict" | "goal_not_published" | "goal_not_executable" | "goal_not_ready" | "schema_override_not_allowed" | "variables_invalid" | "provider_unavailable" | "internal_error" | "not_found";
             message: string;
             details: {
                 [key: string]: unknown;
@@ -652,7 +791,7 @@ export interface components {
         };
     };
     parameters: {
-        /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. */
+        /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. A persisted creation failure replays its original HTTP status and error body; use a new key for a new attempt after resolving the error. While creation is still in progress, a duplicate returns `409 idempotency_conflict` with `details.reason_code=creation_in_progress`. A different request using the same key returns `409 idempotency_conflict`. */
         IdempotencyKey: string;
         /**
          * @description Required business-stable identity for one logical Goal Run, scoped to the authenticated
@@ -706,11 +845,138 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    createAgenticCall: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Persist one key per logical call. Same project, owner, key and input replay the original call; changed input returns 409. */
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAgenticCallRequest"];
+            };
+        };
+        responses: {
+            /** @description Call accepted. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgenticCall"];
+                };
+            };
+            400: components["responses"]["ErrorResponse"];
+            401: components["responses"]["ErrorResponse"];
+            402: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            422: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+            503: components["responses"]["ErrorResponse"];
+        };
+    };
+    getAgenticCall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Developer Call id returned by v2. */
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Committed response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgenticCall"];
+                };
+            };
+            400: components["responses"]["ErrorResponse"];
+            401: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+        };
+    };
+    cancelAgenticCall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Developer Call id returned by v2. */
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Committed response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgenticCall"];
+                };
+            };
+            400: components["responses"]["ErrorResponse"];
+            401: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+        };
+    };
+    listAgenticCallEvents: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from the previous page; scoped to this call. */
+                cursor?: string;
+                /** @description Page size; values are clamped to 1–100. */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Developer Call id returned by v2. */
+                call_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Committed response. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventList"];
+                };
+            };
+            400: components["responses"]["ErrorResponse"];
+            401: components["responses"]["ErrorResponse"];
+            403: components["responses"]["ErrorResponse"];
+            404: components["responses"]["ErrorResponse"];
+            409: components["responses"]["ErrorResponse"];
+            500: components["responses"]["ErrorResponse"];
+        };
+    };
     createCall: {
         parameters: {
             query?: never;
             header?: {
-                /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. */
+                /** @description Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. A persisted creation failure replays its original HTTP status and error body; use a new key for a new attempt after resolving the error. While creation is still in progress, a duplicate returns `409 idempotency_conflict` with `details.reason_code=creation_in_progress`. A different request using the same key returns `409 idempotency_conflict`. */
                 "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
             };
             path?: never;
@@ -736,8 +1002,42 @@ export interface operations {
             403: components["responses"]["ErrorResponse"];
             409: components["responses"]["ErrorResponse"];
             422: components["responses"]["ErrorResponse"];
-            429: components["responses"]["ErrorResponse"];
+            /** @description An account concurrency limit (`account_concurrency_exceeded`), or LLM token budget (`llm_token_budget_exceeded`) was reached. Account admission is checked before planning. Concurrency errors identify the effective line type and limit. Shared-line errors include KYC and dedicated-number purchase guidance in the message and `details.upgrade`; purchased-line errors ask the user to wait for capacity without another purchase suggestion. Configured limits override the default 1 / 10 values. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "error": {
+                     *         "code": "account_concurrency_exceeded",
+                     *         "message": "Your default shared line (such as us/all) is at its account concurrency limit of 1. This limit is shared across API, MCP, and Dashboard. Wait for an active task to finish, then retry. For up to 10 concurrent tasks, complete identity verification (KYC), purchase a dedicated phone number, and select the activated number as your default outbound number. [Verify identity and buy a number](https://dashboard.heycall-e.com/account/numbers/buy).",
+                     *         "details": {
+                     *           "line_type": "platform_default",
+                     *           "max_active_tasks": 1,
+                     *           "upgrade": {
+                     *             "max_active_tasks": 10,
+                     *             "kyc_required": true,
+                     *             "purchase_url": "https://dashboard.heycall-e.com/account/numbers/buy"
+                     *           }
+                     *         }
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             500: components["responses"]["ErrorResponse"];
+            /** @description The provider or an account control is unavailable (`provider_unavailable`, `account_concurrency_unavailable`, or `llm_token_budget_unavailable`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
         };
     };
     getCall: {
@@ -1002,7 +1302,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["WebhookEvent"];
+                "application/json": components["schemas"]["TerminalWebhookEvent"];
             };
         };
         responses: {

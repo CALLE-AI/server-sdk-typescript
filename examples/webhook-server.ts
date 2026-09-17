@@ -34,13 +34,8 @@ const server = createServer(async (request, response) => {
       console.log("Call completed", {
         eventId,
         callId: event.data.id,
-        taskCompleted: event.data.task_completed,
-        completionConfidence: event.data.completion_confidence,
-        evidence: event.data.evidence,
-        structuredResult: event.data.structured_result,
-        recipientResults: event.data.recipients.map(
-          (recipient) => recipient.structured_result
-        )
+        result: event.data.object === "call" ? event.data.result : event.data.structured_result,
+        error: event.data.object === "call" ? event.data.error : undefined
       });
     } else {
       console.log("CALL-E webhook event", {

@@ -31,7 +31,7 @@ function parameterRefs(path, method) {
 
 assertContract(spec.openapi === "3.1.0", "expected OpenAPI 3.1.0");
 assertContract(spec.info?.title === "CALL-E Developer API", "unexpected title");
-assertContract(spec.info?.version === "0.7.0", "unexpected API version");
+assertContract(spec.info?.version === "1.0.0", "unexpected API version");
 
 const requiredOperations = [
   {
@@ -91,7 +91,7 @@ const requiredOperations = [
     path: "/calle/webhook",
     method: "post",
     operationId: "receiveWebhookEvent",
-    requestSchema: "#/components/schemas/WebhookEvent",
+    requestSchema: "#/components/schemas/TerminalWebhookEvent",
     responseSchema: "#/components/schemas/WebhookAcknowledgement",
     errorStatuses: [],
   },
@@ -118,7 +118,8 @@ for (const operation of requiredOperations) {
 
   for (const status of operation.errorStatuses) {
     assertContract(
-      endpoint.responses?.[status]?.$ref === "#/components/responses/ErrorResponse",
+      endpoint.responses?.[status]?.$ref === "#/components/responses/ErrorResponse" ||
+        endpoint.responses?.[status]?.content?.["application/json"]?.schema?.$ref === "#/components/schemas/ErrorEnvelope",
       `missing stable ${status} error response for ${operation.method.toUpperCase()} ${operation.path}`,
     );
   }

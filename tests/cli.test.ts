@@ -4,18 +4,12 @@ import type { Call, EventList, GoalRun } from "../src/index.js";
 
 const completedCall: Call = {
   id: "call_123",
-  object: "call_task",
+  object: "call",
   status: "completed",
   task: "Call.",
-  recipients: [],
-  structuredResult: null,
-  summary: "Done.",
-  taskCompleted: true,
-  completionConfidence: { score: 0.92, label: "high" },
-  evidence: ["The recipient said yes."],
+  phone: "+14155550100", region: "US", locale: "en-US", scheduledAt: null,
+  result: {}, error: null,
   metadata: {},
-  failureCode: null,
-  failureMessage: null,
   createdAt: "2026-05-31T00:00:00Z",
   completedAt: "2026-05-31T00:01:00Z"
 };
@@ -87,11 +81,7 @@ describe("calle CLI", () => {
     const queuedCall: Call = {
       ...completedCall,
       status: "queued",
-      structuredResult: null,
-      summary: null,
-      taskCompleted: null,
-      completionConfidence: null,
-      evidence: [],
+      result: null,
       completedAt: null
     };
     const inProgressCall: Call = {
@@ -99,7 +89,7 @@ describe("calle CLI", () => {
       status: "in_progress"
     };
     const create = vi.fn(async () => queuedCall);
-    const get = vi.fn().mockResolvedValueOnce(inProgressCall).mockResolvedValueOnce(completedCall);
+    const get = vi.fn().mockResolvedValueOnce(inProgressCall).mockResolvedValueOnce({ ...completedCall, result: null }).mockResolvedValueOnce(completedCall);
     const listEvents = vi.fn().mockResolvedValueOnce(connectedEvents).mockResolvedValue(emptyEvents);
     const createAndWait = vi.fn();
     const createClient = vi.fn(() => ({
@@ -117,6 +107,7 @@ describe("calle CLI", () => {
         "create",
         "--phone",
         "+14155550100",
+        "--region", "US", "--locale", "en-US", "--result-schema", '{"type":"object","properties":{},"additionalProperties":false}',
         "--task",
         "Call and ask whether they can hear clearly.",
         "--wait",
@@ -146,14 +137,15 @@ describe("calle CLI", () => {
     expect(create).toHaveBeenCalledWith(
       {
         task: "Call and ask whether they can hear clearly.",
-        recipients: [{ phones: ["+14155550100"] }]
+        phone: "+14155550100", region: "US", locale: "en-US",
+        resultSchema: { type: "object", properties: {}, additionalProperties: false }
       },
       {
         idempotencyKey: "idem_123"
       }
     );
     expect(createAndWait).not.toHaveBeenCalled();
-    expect(get).toHaveBeenCalledTimes(2);
+    expect(get).toHaveBeenCalledTimes(3);
     expect(listEvents).toHaveBeenCalledWith("call_123", { limit: 100 });
     expect(listEvents).toHaveBeenCalledWith("call_123", { cursor: "2-0", limit: 100 });
     expect(stderr.join("")).toContain("Creating call task...");

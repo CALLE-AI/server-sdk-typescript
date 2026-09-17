@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CALL-E Developer API
-  version: 0.7.0
+  version: 1.0.0
   description: Developer API contract used by the CALL-E TypeScript and Python SDKs.
 servers:
   - url: https://api.heycall-e.com
@@ -9,13 +9,145 @@ servers:
 security:
   - bearerAuth: []
 paths:
+  /v2/calls:
+    post:
+      operationId: createAgenticCall
+      tags:
+      - calls
+      summary: Create a single Agentic call
+      description: Accept one phone for durable Agentic execution. Batch recipients,
+        recurrence and recipient_result_schema are not accepted. The accepted request
+        and result_schema are immutable. In this draft scheduled_at is reserved and
+        non-null values return 422 scheduling_unavailable until renewable execution
+        authorization is configured.
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: Persist one key per logical call. Same project, owner, key and
+          input replay the original call; changed input returns 409.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 255
+      responses:
+        '202':
+          description: Call accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgenticCall'
+        '400': &id001
+          $ref: '#/components/responses/ErrorResponse'
+        '401': *id001
+        '402': *id001
+        '403': *id001
+        '409': *id001
+        '422': *id001
+        '503': *id001
+        '500': *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgenticCallRequest'
+  /v2/calls/{call_id}:
+    get:
+      operationId: getAgenticCall
+      tags:
+      - calls
+      summary: Read a committed Agentic call result
+      description: Polling reads persisted state and never performs extraction or initiates
+        a call.
+      parameters:
+      - &id002
+        name: call_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Developer Call id returned by v2.
+      responses:
+        '200':
+          description: Committed response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgenticCall'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '500': *id001
+  /v2/calls/{call_id}/cancel:
+    post:
+      operationId: cancelAgenticCall
+      tags:
+      - calls
+      summary: Cancel before provider submission
+      description: Cancellation is idempotent for terminal calls. Once provider submission
+        starts, returns 409 call_cannot_cancel; it does not hang up an active call.
+      parameters:
+      - *id002
+      responses:
+        '200':
+          description: Committed response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgenticCall'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '500': *id001
+  /v2/calls/{call_id}/events:
+    get:
+      operationId: listAgenticCallEvents
+      tags:
+      - calls
+      summary: List call lifecycle events
+      description: Accepted, submission-started and terminal events, ordered chronologically.
+        Internal Agentic events are not exposed. These stable lifecycle events can be
+        polled with the returned cursor.
+      parameters:
+      - *id002
+      - name: cursor
+        in: query
+        description: Opaque cursor from the previous page; scoped to this call.
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Page size; values are clamped to 1–100.
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+          maximum: 100
+      responses:
+        '200':
+          description: Committed response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventList'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '500': *id001
   /v1/calls:
     post:
       operationId: createCall
       tags:
         - calls
       summary: Create Call
-      description: Create an asynchronous call. Use `result_schema` and `recipient_result_schema` to ask CALL-E to extract structured JSON results from terminal call evidence.
+      description: Create an asynchronous call. Use `result_schema` and `recipient_result_schema` to ask CALL-E to extract structured JSON results from terminal call evidence. Shared platform outbound lines support one phone number per task. Batch calls require an eligible purchased number selected as the account default outbound number; otherwise creation returns `422 call_not_ready`. Account concurrency and LLM token usage are controlled by the effective account configuration. Task concurrency defaults to 1 on shared platform lines and 10 on eligible dedicated purchased numbers; selecting a purchased number as the account default does not make it a shared platform line.
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -26,7 +158,7 @@ paths:
               $ref: "#/components/schemas/CreateCallRequest"
             examples:
               batchLunch:
-                summary: Check Friday lunch availability for two recipients.
+                summary: Check Friday lunch availability for two recipients using an eligible purchased outbound number.
                 value:
                   task: Call each recipient and ask whether they can attend Friday lunch in San Francisco.
                   recipients:
@@ -172,9 +304,30 @@ paths:
         "422":
           $ref: "#/components/responses/ErrorResponse"
         "429":
-          $ref: "#/components/responses/ErrorResponse"
+          description: An account concurrency limit (`account_concurrency_exceeded`), or LLM token budget (`llm_token_budget_exceeded`) was reached. Account admission is checked before planning. Concurrency errors identify the effective line type and limit. Shared-line errors include KYC and dedicated-number purchase guidance in the message and `details.upgrade`; purchased-line errors ask the user to wait for capacity without another purchase suggestion. Configured limits override the default 1 / 10 values.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                error:
+                  code: account_concurrency_exceeded
+                  message: Your default shared line (such as us/all) is at its account concurrency limit of 1. This limit is shared across API, MCP, and Dashboard. Wait for an active task to finish, then retry. For up to 10 concurrent tasks, complete identity verification (KYC), purchase a dedicated phone number, and select the activated number as your default outbound number. [Verify identity and buy a number](https://dashboard.heycall-e.com/account/numbers/buy).
+                  details:
+                    line_type: platform_default
+                    max_active_tasks: 1
+                    upgrade:
+                      max_active_tasks: 10
+                      kyc_required: true
+                      purchase_url: https://dashboard.heycall-e.com/account/numbers/buy
         "500":
           $ref: "#/components/responses/ErrorResponse"
+        "503":
+          description: The provider or an account control is unavailable (`provider_unavailable`, `account_concurrency_unavailable`, or `llm_token_budget_unavailable`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /v1/calls/{call_id}:
     get:
       operationId: getCall
@@ -660,7 +813,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/WebhookEvent"
+              $ref: "#/components/schemas/TerminalWebhookEvent"
             examples:
               callCompleted:
                 summary: Completed US Friday lunch webhook.
@@ -738,7 +891,7 @@ components:
     IdempotencyKey:
       name: Idempotency-Key
       in: header
-      description: Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate.
+      description: Stable caller-provided key used to make create-call retries safe. Reusing the same key with the same request returns the original call instead of creating a duplicate. A persisted creation failure replays its original HTTP status and error body; use a new key for a new attempt after resolving the error. While creation is still in progress, a duplicate returns `409 idempotency_conflict` with `details.reason_code=creation_in_progress`. A different request using the same key returns `409 idempotency_conflict`.
       required: false
       schema:
         type: string
@@ -842,6 +995,150 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
+    CreateAgenticCallRequest:
+      additionalProperties: false
+      properties:
+        task:
+          minLength: 1
+          type: string
+        phone:
+          pattern: ^\+[1-9][0-9]{7,14}$
+          type: string
+        region:
+          pattern: ^[A-Z]{2}$
+          type: string
+        locale:
+          maxLength: 64
+          minLength: 2
+          type: string
+        result_schema:
+          type: object
+          additionalProperties: true
+          description: Required closed flat JSON Schema using the same calle.result.scalar-object.v1 profile
+            as Goal. At most 32 string, boolean, integer or number properties; additionalProperties must be
+            false. Nested objects, arrays, null values and schema combinators are unsupported.
+        scheduled_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+          description: Reserved draft field. Non-null values currently return scheduling_unavailable; do not
+            use until scheduled authorization is enabled.
+        metadata:
+          additionalProperties: true
+          type: object
+        webhook_url:
+          anyOf:
+          - format: uri
+            minLength: 1
+            type: string
+          - type: 'null'
+      required:
+      - task
+      - phone
+      - region
+      - locale
+      - result_schema
+      type: object
+      description: One phone, explicit dialing locale and a required Goal-compatible result schema.
+    AgenticCall:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        object:
+          const: call
+          type: string
+        status:
+          $ref: '#/components/schemas/GoalRunStatus'
+        task:
+          type: string
+        phone:
+          type: string
+        region:
+          type: string
+        locale:
+          type: string
+        scheduled_at:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        result:
+          type:
+          - object
+          - 'null'
+          description: Result validated against the submitted result_schema and durably persisted, or null
+            while processing or on error.
+          additionalProperties:
+            $ref: '#/components/schemas/GoalScalar'
+        error:
+          description: 'Unified execution or result-processing error, or `null`. Branch on `code`; keep `message`
+
+            for logs and operators. A non-null error is final and is mutually exclusive with `result`.'
+          oneOf:
+          - $ref: '#/components/schemas/GoalRunError'
+          - type: 'null'
+        metadata:
+          additionalProperties: true
+          type: object
+        created_at:
+          format: date-time
+          type: string
+        completed_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: UTC telephone-execution completion time, or `null` while execution is non-terminal.
+      required:
+      - id
+      - object
+      - status
+      - task
+      - phone
+      - region
+      - locale
+      - scheduled_at
+      - result
+      - error
+      - metadata
+      - created_at
+      - completed_at
+      type: object
+      description: Persisted one-shot snapshot with the same result/error contract as Goal Run. Continue polling
+        while both are null, even when status is completed. An empty result object is ready. Execution completion
+        does not imply business success. Terminal webhooks are sent after result or error is ready.
+    TerminalWebhookEvent:
+      description: Terminal event for either a legacy v1 call task or an Agentic v2 call. Inspect data.object to distinguish the payload.
+      anyOf:
+        - $ref: '#/components/schemas/WebhookEvent'
+        - $ref: '#/components/schemas/AgenticWebhookEvent'
+    AgenticWebhookEvent:
+      type: object
+      required:
+      - id
+      - type
+      - created_at
+      - data
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+          - call.completed
+          - call.failed
+          - call.canceled
+        created_at:
+          type: string
+          format: date-time
+        data:
+          $ref: '#/components/schemas/AgenticCall'
+      description: v2 terminal webhook. data is identical to the terminal GET response.
+        A valid call completion can carry a failed custom result. Retries reuse the same
+        event id.
     GoalList:
       type: object
       description: |-
@@ -1135,7 +1432,7 @@ components:
           type:
             - array
             - "null"
-          description: Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use.
+          description: Optional explicit recipients for this call task. Omit it when the task text already contains the phone targets CALL-E should use. The default outbound line permits one phone number in total across all recipients. Multiple targets require an eligible purchased outbound number; this also applies to targets inferred from task text.
           minItems: 1
           items:
             $ref: "#/components/schemas/CallTaskRecipientRequest"
@@ -1574,8 +1871,7 @@ components:
           $ref: "#/components/schemas/WebhookCallData"
     WebhookCallData:
       description: Complete terminal call task state included in webhook events. This shape is the same stable `call_task` object returned by the calls API after post-call outcome and requested structured-result finalization.
-      allOf:
-        - $ref: "#/components/schemas/CallTask"
+      $ref: "#/components/schemas/CallTask"
     WebhookAcknowledgement:
       type: object
       description: Example acknowledgement response from your webhook receiver. CALL-E treats any 2xx response as delivered and ignores the response body.
@@ -1603,10 +1899,16 @@ components:
         code:
           type: string
           enum:
+            - call_cannot_cancel
+            - scheduling_unavailable
             - invalid_request
             - unauthorized
             - forbidden
             - rate_limit_exceeded
+            - account_concurrency_exceeded
+            - account_concurrency_unavailable
+            - llm_token_budget_exceeded
+            - llm_token_budget_unavailable
             - insufficient_balance
             - unsupported_region
             - unsupported_language

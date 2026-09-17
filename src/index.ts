@@ -1,5 +1,5 @@
 export { CalleClient, type CalleClientOptions } from "./client.js";
-export { type Call, type CallRecipient, type CreateCallInput, type EventList, type JsonObject } from "./calls.js";
+export { type Call, type CreateCallInput, type RequestOptions, type WaitOptions, type EventList, type JsonObject } from "./calls.js";
 export {
   type Goal,
   type GoalList,

@@ -7,23 +7,12 @@ const client = new CalleClient({
 
 const call = await client.calls.createAndWait(
   {
-    task: "Call each recipient and ask whether they can attend Friday lunch in San Francisco.",
-    recipients: [
-      {
-        phones: [process.env.CALLE_EXAMPLE_PHONE ?? "+14155550100"],
-        region: "US",
-        locale: "en-US"
-      }
-    ],
+    task: "Call the recipient and ask whether they can attend Friday lunch in San Francisco.",
+    phone: process.env.CALLE_EXAMPLE_PHONE ?? "+14155550100",
+    region: "US", locale: "en-US",
     resultSchema: {
       type: "object",
-      required: ["completed_count"],
-      properties: {
-        completed_count: { type: "integer" }
-      }
-    },
-    recipientResultSchema: {
-      type: "object",
+      additionalProperties: false,
       required: ["can_attend"],
       properties: {
         can_attend: { type: "string", enum: ["yes", "no", "unknown"] }

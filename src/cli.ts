@@ -8,8 +8,8 @@ import type { GoalRun, GoalVariables, RunGoalInput, WaitForGoalResultOptions } f
 
 interface CliClient {
   calls: {
-    create(input: CreateCallInput, options?: RequestOptions): Promise<Call>;
-    createAndWait(input: CreateCallInput, options?: RequestOptions & WaitOptions): Promise<Call>;
+    create(input: CreateCallInput, options: RequestOptions): Promise<Call>;
+    createAndWait(input: CreateCallInput, options: RequestOptions & WaitOptions): Promise<Call>;
     get(callId: string): Promise<Call>;
     listEvents(callId: string, options?: ListEventsOptions): Promise<EventList>;
   };
@@ -20,7 +20,7 @@ interface CliClient {
 }
 
 interface RequestOptions {
-  idempotencyKey?: string;
+  idempotencyKey: string;
 }
 
 interface WaitOptions {
@@ -43,6 +43,9 @@ interface CliFlags {
   json: boolean;
   phones: string[];
   task?: string;
+  resultSchema?: string;
+  region?: string;
+  locale?: string;
   timeoutMs?: number;
   variables?: string;
   wait: boolean;
@@ -67,7 +70,7 @@ export interface RunCalleCliOptions {
 }
 
 const usage = `Usage:
-  calle calls create --task <text> [--phone <E164>] [--wait] [--api-key <key>]
+  calle calls create --task <text> --phone <E164> --region <ISO2> --locale <locale> --result-schema <json> --idempotency-key <key> [--wait] [--api-key <key>]
   calle calls get <call_id> [--api-key <key>]
   calle goals run --goal-id <goal_id> --phone <E164> --idempotency-key <key> [--variables <json>] [--wait]
 
@@ -75,7 +78,10 @@ Options:
   --api-key <key>             CALL-E API key. Overrides CALLE_API_KEY.
   --base-url <url>            CALL-E API base URL. Overrides CALLE_BASE_URL.
   --goal-id <goal_id>         Published Goal identity.
-  --phone <number>            E.164 phone number. Repeatable.
+  --phone <number>            Exactly one E.164 phone number.
+  --region <ISO2>            Calls: target region, for example US.
+  --locale <locale>          Calls: language locale, for example en-US.
+  --result-schema <json>     Required flat, closed result JSON Schema for Calls.
   --task <text>               Call task instruction.
   --variables <json>          JSON object containing per-Run scalar variables.
   --wait                      Poll until the requested call or Goal result is ready.
@@ -134,8 +140,17 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--phone") {
       flags.phones.push(readOption(argv, index, arg));
       index += 1;
+    } else if (arg === "--region") {
+      flags.region = readOption(argv, index, arg);
+      index += 1;
+    } else if (arg === "--locale") {
+      flags.locale = readOption(argv, index, arg);
+      index += 1;
     } else if (arg === "--task") {
       flags.task = readOption(argv, index, arg);
+      index += 1;
+    } else if (arg === "--result-schema") {
+      flags.resultSchema = readOption(argv, index, arg);
       index += 1;
     } else if (arg === "--variables") {
       flags.variables = readOption(argv, index, arg);
@@ -179,19 +194,20 @@ function createInput(flags: CliFlags): CreateCallInput {
   if (!flags.task) {
     throw new Error("Missing call task. Pass --task <text>.");
   }
-  const input: CreateCallInput = { task: flags.task };
-  if (flags.phones.length > 0) {
-    input.recipients = flags.phones.map((phone) => ({ phones: [phone] }));
+  if (flags.phones.length !== 1 || !flags.region || !flags.locale) {
+    throw new Error("Calls require one --phone, --region and --locale.");
   }
-  return input;
+  if (!flags.resultSchema) throw new Error("Calls require --result-schema <json>.");
+  const resultSchema: unknown = JSON.parse(flags.resultSchema);
+  if (resultSchema === null || Array.isArray(resultSchema) || typeof resultSchema !== "object") {
+    throw new Error("--result-schema must be a JSON object.");
+  }
+  return { task: flags.task, phone: flags.phones[0]!, region: flags.region, locale: flags.locale, resultSchema: resultSchema as Record<string, unknown> };
 }
 
 function createRequestOptions(flags: CliFlags): RequestOptions {
-  const options: RequestOptions = {};
-  if (flags.idempotencyKey !== undefined) {
-    options.idempotencyKey = flags.idempotencyKey;
-  }
-  return options;
+  if (!flags.idempotencyKey?.trim()) throw new Error("Calls require --idempotency-key.");
+  return { idempotencyKey: flags.idempotencyKey };
 }
 
 function printCall(call: Call, json: boolean, stdout: (text: string) => void): void {
@@ -299,8 +315,8 @@ function formatError(error: unknown): string {
   return String(error);
 }
 
-function isTerminalCall(call: Call): boolean {
-  return call.status === "completed" || call.status === "failed" || call.status === "canceled";
+function isCallResultReady(call: Call): boolean {
+  return call.result !== null || call.error !== null;
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -339,7 +355,7 @@ async function waitForCallResult(
   client: CliClient,
   stderr: (text: string) => void
 ): Promise<Call> {
-  if (isTerminalCall(call)) {
+  if (isCallResultReady(call)) {
     return call;
   }
 
@@ -365,7 +381,7 @@ async function waitForCallResult(
       stderr(`Status: ${nextCall.status}\n`);
       lastStatus = nextCall.status;
     }
-    if (isTerminalCall(nextCall)) {
+    if (isCallResultReady(nextCall)) {
       return nextCall;
     }
   }
