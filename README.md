@@ -23,7 +23,7 @@ environments. Do not expose CALL-E API keys in browser code.
 - `client.calls` creates, reads, and polls call tasks and lists call events.
 - `client.goals` lists and reads published Goals and runs them with typed
   results.
-- The `calle` CLI supports common Calls and Goals workflows from scripts and
+- The CLI supports common Calls and Goals workflows from scripts and
   terminals.
 - `examples/webhook-server.ts` shows how to receive current terminal webhook
   events.
@@ -42,6 +42,43 @@ Use a local checkout for development and package smoke tests:
 pnpm install
 pnpm run validate
 ```
+
+## CLI command migration (unreleased)
+
+The next release renames the SDK command from `calle` to `calle-api`.
+Version 0.7.0 still installs `calle`. Update scripts that call the SDK CLI:
+
+```bash
+# Version 0.7.0
+calle calls get call_123 --json
+
+# After upgrading to the renamed CLI
+calle-api calls get call_123 --json
+```
+
+The npm package remains `@call-e/calle`, and SDK imports and methods are
+unchanged. The MCP package `@call-e/cli` keeps its `calle` command; the SDK no
+longer installs that name.
+
+If you installed both packages in the same project, npm can remove the MCP
+`calle` entry while upgrading the old SDK. After upgrading, rebuild the MCP
+entry from that project:
+
+```bash
+npm rebuild @call-e/cli --ignore-scripts
+```
+
+For global installations, use the same prefix where you installed both packages:
+
+```bash
+npm rebuild --global --prefix "<same-prefix>" @call-e/cli --ignore-scripts
+```
+
+The CLI examples below require an installed build with `calle-api`.
+`--yes=false` disables automatic installation; `--` separates npx options
+from the CLI command.
+For a source checkout, build with `pnpm run build` and use
+`node ./dist/cli.js` in place of `npx --yes=false -- calle-api`.
 
 ## Configuration
 
@@ -120,10 +157,10 @@ The Goal example performs a real call. Use an API key, Goal, phone number, and
 idempotency key for the selected environment. Persist and reuse the same key
 when retrying the same logical request.
 
-Run the CLI from npm with `npx`:
+Run the installed CLI:
 
 ```bash
-npx @call-e/calle@latest calls create \
+npx --yes=false -- calle-api calls create \
   --api-key "$CALLE_API_KEY" \
   --base-url "https://api.heycall-e.com" \
   --phone "+14155550100" \
@@ -141,7 +178,7 @@ developer events returned by the call events API.
 Query an existing call:
 
 ```bash
-npx @call-e/calle@latest calls get call_123 --api-key "$CALLE_API_KEY" --json
+npx --yes=false -- calle-api calls get call_123 --api-key "$CALLE_API_KEY" --json
 ```
 
 Run the webhook receiver example:
@@ -202,7 +239,7 @@ if (run.result !== null) {
 Run the same published Goal through the CLI:
 
 ```bash
-npx @call-e/calle@latest goals run \
+npx --yes=false -- calle-api goals run \
   --goal-id "goal_delivery_confirmation" \
   --phone "+14155550100" \
   --variables '{"customer_name":"Taylor","order_reference":"ORD-8472","delivery_window":"July 24, 2:00-4:00 PM"}' \

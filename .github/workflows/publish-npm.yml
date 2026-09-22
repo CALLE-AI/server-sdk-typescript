@@ -294,7 +294,25 @@ jobs:
 
           for attempt in {1..10}; do
             if npm install --ignore-scripts --no-audit --no-fund "@call-e/calle@${PACKAGE_VERSION}"; then
-              if node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; const client = new CalleClient({ apiKey: "smoke" }); if (typeof client.goals.runAndWait !== "function") process.exit(1);' && ./node_modules/.bin/calle --help | grep "Usage:" >/dev/null; then
+              if node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import { execFileSync } from "node:child_process";
+          import { existsSync, readFileSync } from "node:fs";
+          import { CalleClient } from "@call-e/calle";
+
+          const manifest = JSON.parse(readFileSync("node_modules/@call-e/calle/package.json", "utf8"));
+          assert.equal(manifest.name, "@call-e/calle");
+          assert.equal(manifest.bin?.["calle-api"], "./dist/cli.js");
+          assert.equal(Object.hasOwn(manifest.bin, "calle"), false);
+          assert.equal(existsSync("node_modules/.bin/calle"), false);
+          const client = new CalleClient({ apiKey: "smoke" });
+          assert.equal(typeof client.goals.runAndWait, "function");
+          const help = execFileSync("./node_modules/.bin/calle-api", ["--help"], { encoding: "utf8" });
+          for (const command of ["calls create", "calls get", "goals run"]) {
+            assert.ok(help.includes(`calle-api ${command}`), `Missing SDK CLI help: ${command}`);
+          }
+          NODE
+              then
                 exit 0
               fi
 

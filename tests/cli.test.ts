@@ -80,7 +80,30 @@ const failedGoalRun: GoalRun = {
   }
 };
 
-describe("calle CLI", () => {
+describe("calle-api CLI", () => {
+  it("uses calle-api in help and missing call id guidance", async () => {
+    for (const argv of [["--help"], ["calls", "get"]]) {
+      const stdout: string[] = [];
+      const stderr: string[] = [];
+      const createClient = vi.fn();
+      const exitCode = await runCalleCli({
+        argv,
+        env: { CALLE_API_KEY: "test-key" },
+        stdout: (text) => stdout.push(text),
+        stderr: (text) => stderr.push(text),
+        createClient
+      });
+
+      expect(exitCode).toBe(argv[0] === "--help" ? 0 : 1);
+      const output = [...stdout, ...stderr].join("");
+      expect(output).toContain("calle-api calls get");
+      expect(output).not.toMatch(/\bcalle (calls|goals)\b/);
+      if (argv[0] === "--help") {
+        expect(createClient).not.toHaveBeenCalled();
+      }
+    }
+  });
+
   it("prints wait progress to stderr while keeping the final JSON on stdout", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];

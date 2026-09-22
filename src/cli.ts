@@ -67,9 +67,9 @@ export interface RunCalleCliOptions {
 }
 
 const usage = `Usage:
-  calle calls create --task <text> [--phone <E164>] [--wait] [--api-key <key>]
-  calle calls get <call_id> [--api-key <key>]
-  calle goals run --goal-id <goal_id> --phone <E164> --idempotency-key <key> [--variables <json>] [--wait]
+  calle-api calls create --task <text> [--phone <E164>] [--wait] [--api-key <key>]
+  calle-api calls get <call_id> [--api-key <key>]
+  calle-api goals run --goal-id <goal_id> --phone <E164> --idempotency-key <key> [--variables <json>] [--wait]
 
 Options:
   --api-key <key>             CALL-E API key. Overrides CALLE_API_KEY.
@@ -397,7 +397,7 @@ async function runCreate(
 async function runGet(positionals: string[], flags: CliFlags, client: CliClient, stdout: (text: string) => void): Promise<void> {
   const callId = positionals[0];
   if (!callId) {
-    throw new Error("Missing call id. Usage: calle calls get <call_id>");
+    throw new Error("Missing call id. Usage: calle-api calls get <call_id>");
   }
   const call = await client.calls.get(callId);
   printCall(call, flags.json, stdout);

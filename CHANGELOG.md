@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** Rename the SDK executable from `calle` to `calle-api` and remove
+  the old bin entry so it no longer collides with `@call-e/cli`. Update shell
+  scripts to use `calle-api`; the `@call-e/calle` package name, imports, and SDK
+  methods are unchanged. When upgrading an installation that also contains
+  `@call-e/cli`, rebuild its `calle` entry as described in the README.
 - Stable publishing is initiated by a versioned GitHub Release and uses npm
   Trusted Publishing.
 - npm publishing and dist-tag changes are serialized, and stable releases must

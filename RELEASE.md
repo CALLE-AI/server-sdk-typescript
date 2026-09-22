@@ -30,7 +30,29 @@ pnpm run validate
 
 `validate` checks the OpenAPI contract, tests, types, examples, public-repository
 hygiene, the built package, and an install from the single generated tarball.
-It also verifies that the tarball includes `LICENSE`.
+It also verifies that the tarball includes `LICENSE`. CI runs the full check on
+Linux and the packaged CLI installation check on Windows and macOS.
+
+## CLI command migration
+
+Renaming the SDK command from `calle` to `calle-api` is a breaking CLI change.
+The SDK no longer installs a `calle` alias; that name belongs to the separate
+MCP CLI package, `@call-e/cli`.
+
+Before publishing the rename, migrate shell scripts, npm scripts, CI jobs, and
+deployment commands that invoke the SDK to `calle-api`. Keep the existing
+Developer API arguments, `CALLE_API_KEY`, and `CALLE_BASE_URL` settings. Do not
+rename MCP commands to `calle-api`.
+Follow the [CLI migration steps](./README.md#cli-command-migration-unreleased)
+when both packages are installed; upgrading the old SDK can remove the MCP
+command shim, which must be restored in the same installation prefix.
+
+Run `pnpm run test:tarball` and confirm that the installed `calle-api --help`
+lists `calls create`, `calls get`, and `goals run`, while the package manifest
+does not export `calle`. Prepare the breaking release in a separate version PR;
+merging the implementation does not publish or change the package version.
+
+## Stable release
 
 For a stable release:
 
@@ -82,8 +104,9 @@ exactly one of `result` or `error` is non-null.
 ## Post-publish verification
 
 The workflow waits for exact-version registry metadata, installs the published
-package in a temporary project, imports `CalleClient`, and runs the packaged
-CLI help command.
+package in a temporary project, imports `CalleClient`, verifies that its
+SDK command is `calle-api` without a `calle` alias, and runs the installed
+`calle-api --help` to check the Developer API command contract.
 
 A failure in either post-publish check does not mean publication failed. If the
 `npm publish` step succeeded, do not retry the same version. Check the registry
@@ -100,6 +123,7 @@ cd "$tmpdir"
 npm init -y
 npm install "@call-e/calle@${VERSION}"
 node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; const client = new CalleClient({ apiKey: "smoke" }); console.log(typeof client.goals.runAndWait)'
+./node_modules/.bin/calle-api --help
 ```
 
 ## Dist-tags
@@ -118,8 +142,8 @@ version, and requires `beta` to target a prerelease version.
 - Patch releases fix SDK wrapper bugs, type issues, packaging metadata, README
   examples, or distribution issues without changing public API behavior.
 - Minor releases add backward-compatible API fields, endpoints, or SDK helpers.
-- Major releases make breaking public API, method signature, stable error, or
-  webhook signature contract changes.
+- Major releases make breaking CLI command name, public API, method signature,
+  stable error, or webhook signature contract changes.
 
 Keep TypeScript, Python, OpenAPI, and public docs behavior aligned by default. A
 single-language patch is appropriate only when the shared API contract and
