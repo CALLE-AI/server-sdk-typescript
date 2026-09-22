@@ -44,7 +44,8 @@ includes the finalized post-call outcome and requested structured results.
 
 In scope:
 
-- Create a call.
+- Create a call, including multiple recipients when the account has an eligible
+  purchased number selected as its default outbound number.
 - Read a call.
 - Poll until a terminal call result.
 - List call events.
@@ -55,7 +56,6 @@ In scope:
 Out of scope:
 
 - Browser SDK support.
-- Batch calls.
 - Cancel calls.
 - Recurring or scheduled calls.
 - Project-level webhook management.

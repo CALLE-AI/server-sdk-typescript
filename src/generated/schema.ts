@@ -191,7 +191,7 @@ export interface paths {
         put?: never;
         /**
          * Server Message
-         * @description CALL-E sends this request after a call reaches a terminal state and its post-call outcome and requested structured results are finalized. Configure this URL with `webhook_url` on create call or through project-level webhook settings.
+         * @description CALL-E sends this request after a call reaches a terminal state and its post-call outcome and requested structured results are finalized. Configure your receiver URL with `webhook_url` when creating a call.
          */
         post: operations["receiveWebhookEvent"];
         delete?: never;
@@ -414,7 +414,7 @@ export interface components {
             };
             /**
              * Format: uri
-             * @description Optional per-request HTTPS webhook URL. When provided, CALL-E sends terminal call events to this URL in addition to project-level webhook delivery.
+             * @description Optional per-request HTTPS webhook URL. When provided, CALL-E sends terminal call events to this URL after result finalization.
              */
             webhook_url?: string;
         };
