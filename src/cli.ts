@@ -70,7 +70,7 @@ export interface RunCalleCliOptions {
 }
 
 const usage = `Usage:
-  calle calls create --task <text> --phone <E164> --region <ISO2> --locale <locale> --result-schema <json> --idempotency-key <key> [--wait] [--api-key <key>]
+  calle calls create --task <text> --phone <E164> [--region <ISO2>] [--locale <locale>] --result-schema <json> --idempotency-key <key> [--wait] [--api-key <key>]
   calle calls get <call_id> [--api-key <key>]
   calle goals run --goal-id <goal_id> --phone <E164> --idempotency-key <key> [--variables <json>] [--wait]
 
@@ -79,8 +79,8 @@ Options:
   --base-url <url>            CALL-E API base URL. Overrides CALLE_BASE_URL.
   --goal-id <goal_id>         Published Goal identity.
   --phone <number>            Exactly one E.164 phone number.
-  --region <ISO2>            Calls: target region, for example US.
-  --locale <locale>          Calls: language locale, for example en-US.
+  --region <ISO2>            Calls: optional region hint, for example US.
+  --locale <locale>          Calls: optional spoken locale, for example en-US.
   --result-schema <json>     Required flat, closed result JSON Schema for Calls.
   --task <text>               Call task instruction.
   --variables <json>          JSON object containing per-Run scalar variables.
@@ -194,15 +194,19 @@ function createInput(flags: CliFlags): CreateCallInput {
   if (!flags.task) {
     throw new Error("Missing call task. Pass --task <text>.");
   }
-  if (flags.phones.length !== 1 || !flags.region || !flags.locale) {
-    throw new Error("Calls require one --phone, --region and --locale.");
+  if (flags.phones.length !== 1) {
+    throw new Error("Calls require one --phone.");
   }
   if (!flags.resultSchema) throw new Error("Calls require --result-schema <json>.");
   const resultSchema: unknown = JSON.parse(flags.resultSchema);
   if (resultSchema === null || Array.isArray(resultSchema) || typeof resultSchema !== "object") {
     throw new Error("--result-schema must be a JSON object.");
   }
-  return { task: flags.task, phone: flags.phones[0]!, region: flags.region, locale: flags.locale, resultSchema: resultSchema as Record<string, unknown> };
+  return {
+    task: flags.task, phone: flags.phones[0]!, resultSchema: resultSchema as Record<string, unknown>,
+    ...(flags.region !== undefined ? { region: flags.region } : {}),
+    ...(flags.locale !== undefined ? { locale: flags.locale } : {}),
+  };
 }
 
 function createRequestOptions(flags: CliFlags): RequestOptions {
@@ -346,6 +350,8 @@ async function printNewEvents(
   }
   if (events.nextCursor !== null) {
     state.cursor = events.nextCursor;
+  } else if (events.data.length > 0) {
+    state.cursor = events.data[events.data.length - 1]!.id;
   }
 }
 

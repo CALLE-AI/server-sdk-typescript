@@ -3,11 +3,13 @@ import { runCalleCli } from "../src/cli.js";
 import type { Call, EventList, GoalRun } from "../src/index.js";
 
 const completedCall: Call = {
+  transcript: [],
+  callOutcome: "completed", resultStatus: "available",
   id: "call_123",
   object: "call",
   status: "completed",
   task: "Call.",
-  phone: "+14155550100", region: "US", locale: "en-US", scheduledAt: null,
+  phone: "+14155550100", region: "US", locale: "en-US",
   result: {}, error: null,
   metadata: {},
   createdAt: "2026-05-31T00:00:00Z",
@@ -48,6 +50,8 @@ const emptyEvents: EventList = {
 };
 
 const completedGoalRun: GoalRun = {
+  transcript: [],
+  callOutcome: "completed", resultStatus: "available",
   object: "goal_run",
   id: "rgrp_delivery_8472",
   goalId: "goal_delivery",
@@ -75,7 +79,7 @@ const failedGoalRun: GoalRun = {
 };
 
 describe("calle CLI", () => {
-  it("prints wait progress to stderr while keeping the final JSON on stdout", async () => {
+  it.each([true, false])("prints wait progress with explicit target hints=%s", async (withHints) => {
     const stdout: string[] = [];
     const stderr: string[] = [];
     const queuedCall: Call = {
@@ -107,7 +111,8 @@ describe("calle CLI", () => {
         "create",
         "--phone",
         "+14155550100",
-        "--region", "US", "--locale", "en-US", "--result-schema", '{"type":"object","properties":{},"additionalProperties":false}',
+        ...(withHints ? ["--region", "US", "--locale", "en-US"] : []),
+        "--result-schema", '{"type":"object","properties":{},"additionalProperties":false}',
         "--task",
         "Call and ask whether they can hear clearly.",
         "--wait",
@@ -137,7 +142,7 @@ describe("calle CLI", () => {
     expect(create).toHaveBeenCalledWith(
       {
         task: "Call and ask whether they can hear clearly.",
-        phone: "+14155550100", region: "US", locale: "en-US",
+        phone: "+14155550100", ...(withHints ? {region: "US", locale: "en-US"} : {}),
         resultSchema: { type: "object", properties: {}, additionalProperties: false }
       },
       {

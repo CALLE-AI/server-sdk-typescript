@@ -38,6 +38,9 @@ const queuedRun = {
   call_id: null,
   run_spec: { id: "rspec_delivery_v4", version: 4 },
   status: "queued",
+  call_outcome: null,
+  result_status: "pending",
+  transcript: [],
   result: null,
   error: null,
   created_at: "2026-07-22T10:00:00Z",
@@ -45,6 +48,29 @@ const queuedRun = {
 } as const;
 
 describe("CalleClient goals", () => {
+  it("returns transcript independently of a Goal Run result error", async () => {
+    const transcript = [{speaker:"user",offset_seconds:2,text:"Goodbye."}];
+    const client = new CalleClient({apiKey:"test",fetch:async()=>jsonResponse({
+      ...queuedRun,status:"completed",result_status:"unavailable",transcript,
+      error:{code:"result_failed",message:"Result processing failed.",detail_code:null},
+      completed_at:"2026-07-22T10:01:00Z",
+    })});
+    const run = await client.goals.waitForResult("goal_delivery","rgrp_delivery_8472",{intervalMs:1,timeoutMs:100});
+    expect(run.error?.code).toBe("result_failed");
+    expect(run.transcript).toEqual(transcript);
+  });
+  it.each(["no_answer", "busy", "declined"])("finishes a %s Goal Run without a result or error", async (outcome) => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ...queuedRun, status: "completed",
+      call_outcome: outcome, result_status: "unavailable", completed_at: "2026-07-22T10:01:00Z" }));
+    const run = await new CalleClient({apiKey:"test",fetch:fetchMock}).goals.waitForResult(
+      "goal_delivery", "rgrp_delivery_8472", {intervalMs:1,timeoutMs:100},
+    );
+    expect(run.callOutcome).toBe(outcome);
+    expect(run.resultStatus).toBe("unavailable");
+    expect(run.result).toBeNull();
+    expect(run.error).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("lists published Goals with pagination and camel-case models", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
@@ -130,7 +156,7 @@ describe("CalleClient goals", () => {
     const succeeded = {
       ...materializing,
       call_id: "calling_call_delivery_8472",
-      result: { delivery_outcome: "confirmed" }
+      result_status: "available", call_outcome: "completed", result: { delivery_outcome: "confirmed" }
     };
     const fetchMock = vi
       .fn()
@@ -152,8 +178,9 @@ describe("CalleClient goals", () => {
     const failed = {
       ...queuedRun,
       status: "failed",
+      result_status: "not_applicable",
       error: {
-        code: "no_answer",
+        code: "call_failed",
         message: "No human answered the call.",
         detail_code: "provider_no_answer"
       },
@@ -168,7 +195,7 @@ describe("CalleClient goals", () => {
     });
 
     expect(run.error).toEqual({
-      code: "no_answer",
+      code: "call_failed",
       message: "No human answered the call.",
       detailCode: "provider_no_answer"
     });
@@ -178,7 +205,7 @@ describe("CalleClient goals", () => {
     const succeeded = {
       ...queuedRun,
       status: "completed",
-      result: { delivery_outcome: "confirmed" },
+      result_status: "available", call_outcome: "completed", result: { delivery_outcome: "confirmed" },
       completed_at: "2026-07-22T10:01:00Z"
     };
     const fetchMock = vi
@@ -208,7 +235,7 @@ describe("CalleClient goals", () => {
     const succeeded = {
       ...queuedRun,
       status: "completed",
-      result: { delivery_outcome: "confirmed" },
+      result_status: "available", call_outcome: "completed", result: { delivery_outcome: "confirmed" },
       completed_at: "2026-07-22T10:01:00Z"
     };
     const fetchMock = vi.fn(async () => jsonResponse(succeeded, { status: 201 }));

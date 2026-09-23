@@ -11,7 +11,7 @@ environments. Do not expose CALL-E API keys in browser code.
 
 One-shot v2 uses the same `result` / `error` contract as Goal Runs. A required
 closed scalar-object result schema defines the business fields. SDK wait helpers
-continue until either field is non-null, even after execution reaches `completed`.
+continue while `result_status` is `pending`, even after execution reaches `completed`.
 Empty `{}` is a ready result. Webhook data matches the persisted GET snapshot.
 
 ## Documentation
@@ -170,7 +170,7 @@ npx @call-e/calle@0.7.0 goals run \
 ```
 
 Persist the idempotency key before the first request and reuse it for network
-retries. `waitForResult` returns when either `result` or `error` is non-null;
+retries. `waitForResult` returns when `result_status` is no longer `pending`;
 an execution `status` of `completed` can still be waiting for result
 materialization.
 
@@ -199,22 +199,27 @@ Replace `recipient` / `recipients` with `phone`, `region`, and `locale`.
 Define the required `result_schema` (`resultSchema` in TypeScript) using Goal's
 `calle.result.scalar-object.v1` profile: at most 32 scalar properties and
 `additionalProperties: false`. Flatten old nested fields; arrays and null values
-are unsupported. Old `structured_result`, `result_status`, `result_error`, summary,
-confidence and conversation fields are removed. Request business summaries or
+are unsupported. Old `structured_result`, `result_error`, summary,
+confidence and provider attempt fields are removed. Request business summaries or
 completion flags explicitly as scalar fields in the schema when needed.
 Batch and recurring workflows belong to reusable Goals.
 
+Calls and Goal Runs always expose `transcript`, an array of recorded turns with
+`speaker` (`bot`, `user`, `unknown`), nullable `offset_seconds`, and `text`.
+Turn keys retain the HTTP names. Before execution ends or without available
+transcript, the array is empty. A pending, unavailable or failed business result
+does not remove an available terminal transcript. Webhook data uses the same shape.
+
 The returned object is `call`. Consume `result` and `error` exactly as for Goal Runs.
-They are mutually exclusive; both null means keep polling, including after execution
-status becomes completed. Unknown required values produce result_unavailable;
-invalid results produce result_invalid; materialization/persistence failure produces
-result_failed. Execution failures also use error. GET reads committed state and
+Poll while result_status is pending (resultStatus in TypeScript). No-answer, busy
+and declined are ordinary call_outcome values (callOutcome in TypeScript).
+Unavailable business evidence uses result_status=unavailable and error=null.
+Explicit schema-valid task fallbacks remain results. Technical failures use error.
+Cancellation uses result_status=not_applicable and no error. GET reads committed state and
 terminal webhooks contain the same ready snapshot. Deduplicate by event id.
 
 Cancellation returns `409 call_cannot_cancel` after provider submission begins.
-`scheduled_at` / `scheduledAt` is reserved in this draft and currently returns
-`422 scheduling_unavailable`. Do not enable scheduled calls until renewable
-execution authorization is configured. If authorization expires after submission,
+Calls accept immediate execution only. If authorization expires after submission,
 `error.detail_code=authorization_expired` means the provider may still complete the call; do not
 create an automatic replacement call.
 

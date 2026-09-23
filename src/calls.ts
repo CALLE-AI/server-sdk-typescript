@@ -14,10 +14,9 @@ export type CallStatus = ApiCall["status"];
 export interface CreateCallInput {
   task: string;
   phone: string;
-  region: string;
-  locale: string;
+  region?: string | null;
+  locale?: string | null;
   resultSchema: JsonObject;
-  scheduledAt?: string;
   metadata?: JsonObject;
   webhookUrl?: string;
 }
@@ -38,13 +37,16 @@ export interface ListEventsOptions {
 
 export interface Call {
   id: string;
+  callId: string | null;
   object: "call";
   status: CallStatus;
+  callOutcome: ApiCall["call_outcome"];
+  resultStatus: ApiCall["result_status"];
+  transcript: ApiCall["transcript"];
   task: string;
   phone: string;
   region: string;
   locale: string;
-  scheduledAt: string | null;
   result: GoalResult | null;
   error: GoalRunError | null;
   metadata: JsonObject;
@@ -60,9 +62,10 @@ export interface EventList {
 
 function toApiCreateCall(input: CreateCallInput): ApiCreateCallRequest {
   return {
-    task: input.task, phone: input.phone, region: input.region, locale: input.locale,
+    task: input.task, phone: input.phone,
+    ...(input.region !== undefined ? { region: input.region } : {}),
+    ...(input.locale !== undefined ? { locale: input.locale } : {}),
     result_schema: input.resultSchema,
-    ...(input.scheduledAt !== undefined ? { scheduled_at: input.scheduledAt } : {}),
     ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
     ...(input.webhookUrl !== undefined ? { webhook_url: input.webhookUrl } : {})
   };
@@ -71,13 +74,16 @@ function toApiCreateCall(input: CreateCallInput): ApiCreateCallRequest {
 function fromApiCall(call: ApiCall): Call {
   return {
     id: call.id,
+    callId: call.call_id,
     object: call.object,
     status: call.status,
+    callOutcome: call.call_outcome,
+    resultStatus: call.result_status,
+    transcript: call.transcript,
     task: call.task,
     phone: call.phone,
     region: call.region,
     locale: call.locale,
-    scheduledAt: call.scheduled_at,
     result: call.result,
     error: call.error === null ? null : {
       code: call.error.code, message: call.error.message, detailCode: call.error.detail_code
@@ -121,6 +127,9 @@ export class CalleCalls {
   }
 
   async create(input: CreateCallInput, options: RequestOptions): Promise<Call> {
+    if ("scheduledAt" in input) {
+      throw new Error("scheduledAt is not supported; Calls accept immediate execution only.");
+    }
     if (!options?.idempotencyKey?.trim()) {
       throw new Error("A stable idempotencyKey is required.");
     }
@@ -188,7 +197,7 @@ export class CalleCalls {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() <= deadline) {
       const call = await this.get(callId);
-      if (call.result !== null || call.error !== null) {
+      if (call.resultStatus !== "pending") {
         return call;
       }
       await sleep(intervalMs);

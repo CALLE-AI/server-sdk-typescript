@@ -55,6 +55,9 @@ export interface GoalRun {
   callId: string | null;
   runSpec: GoalRunSpec;
   status: GoalRunStatus;
+  callOutcome: ApiGoalRun["call_outcome"];
+  resultStatus: ApiGoalRun["result_status"];
+  transcript: ApiGoalRun["transcript"];
   result: GoalResult | null;
   error: GoalRunError | null;
   createdAt: string;
@@ -111,6 +114,9 @@ function fromApiGoalRun(run: ApiGoalRun): GoalRun {
     callId: run.call_id,
     runSpec: run.run_spec,
     status: run.status,
+    callOutcome: run.call_outcome,
+    resultStatus: run.result_status,
+    transcript: run.transcript,
     result: run.result,
     error:
       run.error === null
@@ -277,7 +283,7 @@ export class CalleGoals {
       } finally {
         clearTimeout(timeout);
       }
-      if (run.result !== null || run.error !== null) {
+      if (run.resultStatus !== "pending") {
         return run;
       }
       const remainingMs = deadline - Date.now();
@@ -295,7 +301,7 @@ export class CalleGoals {
   ): Promise<GoalRun> {
     waitDurations(options);
     const run = await this.run(input);
-    if (run.result !== null || run.error !== null) {
+    if (run.resultStatus !== "pending") {
       return run;
     }
     return await this.waitForResult(input.goalId, run.id, options);
