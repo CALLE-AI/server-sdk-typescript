@@ -6,6 +6,7 @@ const completedCall: Call = {
   transcript: [],
   callOutcome: "completed", resultStatus: "available",
   id: "call_123",
+  callId: "billing_call_123",
   object: "call",
   status: "completed",
   task: "Call.",
@@ -79,12 +80,31 @@ const failedGoalRun: GoalRun = {
 };
 
 describe("calle CLI", () => {
+  it.each([true, false])("finishes unavailable results without result or error, replay=%s", async (replay) => {
+    const final: Call = { ...completedCall, callOutcome: "no_answer", resultStatus: "unavailable", result: null };
+    const queued: Call = { ...final, status: "queued", callOutcome: null, resultStatus: "pending", completedAt: null };
+    const get = vi.fn(async () => final);
+    const stdout: string[] = [];
+    const code = await runCalleCli({
+      argv: ["calls", "create", "--phone", "+14155550100", "--task", "Say hello.",
+        "--result-schema", '{"type":"object","properties":{},"additionalProperties":false}',
+        "--idempotency-key", "stable", "--wait", "--json", "--interval-ms", "1", "--timeout-ms", "100"],
+      env: { CALLE_API_KEY: "test" },
+      stdout: text => stdout.push(text), stderr: () => undefined,
+      createClient: () => ({calls: {create: async () => replay ? final : queued, createAndWait: vi.fn(), get, listEvents: async () => emptyEvents}}),
+    });
+    expect(code).toBe(0);
+    expect(get).toHaveBeenCalledTimes(replay ? 0 : 1);
+    expect(JSON.parse(stdout.join(""))).toMatchObject({resultStatus: "unavailable", result: null, error: null});
+  });
+
   it.each([true, false])("prints wait progress with explicit target hints=%s", async (withHints) => {
     const stdout: string[] = [];
     const stderr: string[] = [];
     const queuedCall: Call = {
       ...completedCall,
       status: "queued",
+      resultStatus: "pending",
       result: null,
       completedAt: null
     };
@@ -93,7 +113,7 @@ describe("calle CLI", () => {
       status: "in_progress"
     };
     const create = vi.fn(async () => queuedCall);
-    const get = vi.fn().mockResolvedValueOnce(inProgressCall).mockResolvedValueOnce({ ...completedCall, result: null }).mockResolvedValueOnce(completedCall);
+    const get = vi.fn().mockResolvedValueOnce(inProgressCall).mockResolvedValueOnce({ ...completedCall, resultStatus: "pending", result: null }).mockResolvedValueOnce(completedCall);
     const listEvents = vi.fn().mockResolvedValueOnce(connectedEvents).mockResolvedValue(emptyEvents);
     const createAndWait = vi.fn();
     const createClient = vi.fn(() => ({
@@ -119,7 +139,7 @@ describe("calle CLI", () => {
         "--api-key",
         "cli_key",
         "--base-url",
-        "https://test-api.heycall-e.com",
+        "https://api.example.test",
         "--idempotency-key",
         "idem_123",
         "--interval-ms",
@@ -137,7 +157,7 @@ describe("calle CLI", () => {
     expect(exitCode).toBe(0);
     expect(createClient).toHaveBeenCalledWith({
       apiKey: "cli_key",
-      baseUrl: "https://test-api.heycall-e.com"
+      baseUrl: "https://api.example.test"
     });
     expect(create).toHaveBeenCalledWith(
       {

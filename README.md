@@ -1,15 +1,15 @@
 # @call-e/calle
 
-> This branch prepares **SDK 1.0.0 (unreleased)** for the Agentic `/v2/calls` API.
-> The published 0.7.0 SDK still uses `/v1/calls`. Use the local build for the
-> examples below; backend rollout and scheduled authorization are not complete.
+[![npm version](https://img.shields.io/npm/v/%40call-e%2Fcalle)](https://www.npmjs.com/package/@call-e/calle)
+[![CI](https://github.com/CALLE-AI/server-sdk-typescript/actions/workflows/ci.yml/badge.svg)](https://github.com/CALLE-AI/server-sdk-typescript/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
 TypeScript server SDK for the CALL-E Developer API.
 
 Use this SDK from backend services, workers, and other trusted server
 environments. Do not expose CALL-E API keys in browser code.
 
-One-shot v2 uses the same `result` / `error` contract as Goal Runs. A required
+SDK 1.0 uses the single-target Calls API and the same result model as Goal Runs. A required
 closed scalar-object result schema defines the business fields. SDK wait helpers
 continue while `result_status` is `pending`, even after execution reaches `completed`.
 Empty `{}` is a ready result. Webhook data matches the persisted GET snapshot.
@@ -21,19 +21,24 @@ Empty `{}` is a ready result. Webhook data matches the persisted GET snapshot.
 - API Reference: <https://docs.heycall-e.com/#/api-reference>
 - Webhooks: <https://docs.heycall-e.com/#/webhooks>
 - Changelog: <https://docs.heycall-e.com/#/changelog>
+- Python server SDK: <https://github.com/CALLE-AI/server-sdk-python>
+
+## SDK surface
+
+- `client.calls` creates, reads, polls and cancels Calls and lists call events.
+- `client.goals` lists and reads published Goals and runs them with typed
+  results.
+- The `calle` CLI supports common Calls and Goals workflows from scripts and
+  terminals.
+- `examples/webhook-server.ts` shows how to receive current terminal webhook
+  events.
 
 ## Install
 
 Install the stable package from npm:
 
 ```bash
-pnpm add @call-e/calle
-```
-
-Pin the current stable release when your deployment process requires exact package reproducibility:
-
-```bash
-pnpm add @call-e/calle@0.7.0
+pnpm add @call-e/calle@1.0.0
 ```
 
 Use a local checkout for development and package smoke tests:
@@ -43,12 +48,58 @@ pnpm install
 pnpm run validate
 ```
 
+## Configuration
+
+Create one `CalleClient` and reuse it for Calls and Goals requests:
+
+| Option | Required | Description |
+| --- | --- | --- |
+| `apiKey` | Yes | CALL-E API key. Load it from a server-side secret store or environment variable. |
+| `baseUrl` | No | API base URL. Defaults to `https://api.heycall-e.com`. |
+| `fetch` | No | Fetch-compatible function for a custom transport or test harness. |
+
+Polling helpers accept interval and timeout options. See the method signatures
+in your editor and the [SDK guide](https://docs.heycall-e.com/#/sdks) for
+details.
+
+## API keys and diagnostic output
+
+Use the complete API key issued by the [CALL-E dashboard](https://dashboard.heycall-e.com/account/api-keys).
+`<YOUR_CALLE_API_KEY>` and the fallback keys in example scripts are non-working
+placeholders. Replace them with your own key; do not derive key validation or
+redaction patterns from a sample prefix.
+
+Before logging or sharing diagnostics:
+
+- Prefer a small set of fields such as SDK version, HTTP status, and error
+  code over dumping a full request, response, or error object.
+- Remove the entire `Authorization` header and configured secret values.
+  Matching one key prefix is not sufficient.
+- Review phone fields and free text, including `task`, transcripts, summaries,
+  evidence, custom results, metadata, and error details. The SDK preserves the
+  returned task text, which may contain a phone number or other private data.
+  Dashboard masking does not redact SDK output or raw API responses.
+
+For example, a manually redacted response excerpt for sharing can omit all
+other fields and replace both the task and recipient phone:
+
+```json
+{
+  "status": "completed",
+  "task": "[REDACTED]",
+  "phone": "[REDACTED]"
+}
+```
+
+This is a diagnostic excerpt, not a create request. Inspect the final text
+before publishing it; these replacements are not a general-purpose PII filter.
+
 ## Examples
 
 Set the API key before running call examples:
 
 ```bash
-export CALLE_API_KEY="calle_test_key"
+export CALLE_API_KEY="<YOUR_CALLE_API_KEY>"
 export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_EXAMPLE_PHONE="+14155550100"
 ```
@@ -62,7 +113,7 @@ pnpm run example:create-and-wait
 Run a published Goal and wait for its structured result:
 
 ```bash
-export CALLE_BASE_URL="https://test-api.heycall-e.com"
+export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_GOAL_ID="<PUBLISHED_GOAL_ID>"
 export CALLE_EXAMPLE_PHONE="<E164_PHONE>"
 export CALLE_GOAL_VARIABLES='{"name":"Alex"}'
@@ -74,10 +125,10 @@ The Goal example performs a real call. Use an API key, Goal, phone number, and
 idempotency key for the selected environment. Persist and reuse the same key
 when retrying the same logical request.
 
-Run the unreleased CLI from the local build:
+Run the installed CLI:
 
 ```bash
-node dist/cli.js calls create \
+npx @call-e/calle@1.0.0 calls create \
   --api-key "$CALLE_API_KEY" \
   --base-url "https://api.heycall-e.com" \
   --phone "<AUTHORIZED_E164_PHONE>" \
@@ -98,7 +149,7 @@ developer events returned by the call events API.
 Query an existing call:
 
 ```bash
-node dist/cli.js calls get call_123 --api-key "$CALLE_API_KEY" --json
+npx @call-e/calle@1.0.0 calls get call_123 --json
 ```
 
 Run the webhook receiver example:
@@ -112,7 +163,9 @@ event JSON without a webhook secret or signature headers. CALL-E sends the
 event only after the post-call outcome and requested structured results are
 finalized. Deduplicate side effects with the event `id` or
 `CALL-E-Event-Id`, and reject events when the required header does not match
-the body `id`.
+the body `id`. The example defaults to a 10 MiB request-body limit and returns
+`413` for larger payloads. Set `CALLE_WEBHOOK_MAX_BODY_BYTES` to match your
+provider and ingress limits.
 
 The `client.webhooks.verify` and signed `client.webhooks.unwrap` methods
 implement the legacy SDK `0.2` contract. They remain available for source
@@ -157,12 +210,9 @@ if (run.result !== null) {
 Run the same published Goal through the CLI:
 
 ```bash
-npx @call-e/calle@0.7.0 goals run \
+npx @call-e/calle@1.0.0 goals run \
   --goal-id "goal_delivery_confirmation" \
   --phone "<AUTHORIZED_E164_PHONE>" \
-  --region US --locale en-US \
-  --result-schema '{"type":"object","properties":{"confirmed":{"type":"boolean"}},"required":["confirmed"],"additionalProperties":false}' \
-  --idempotency-key "hearing-check:example:v1" \
   --variables '{"customer_name":"Taylor","order_reference":"ORD-8472","delivery_window":"July 24, 2:00-4:00 PM"}' \
   --idempotency-key "delivery:ORD-8472:confirm-window:v1" \
   --wait \
@@ -174,11 +224,13 @@ retries. `waitForResult` returns when `result_status` is no longer `pending`;
 an execution `status` of `completed` can still be waiting for result
 materialization.
 
-## One-shot migration in 1.0 (unreleased)
+## Migration to SDK 1.0
 
 The `calls` wrapper now submits one explicit phone to `/v2/calls` and requires
 an idempotency key. Keep the key for retries. The backend continues serving
-existing v1 integrations; use SDK 0.7.x for historical v1 call ids.
+legacy integrations until their planned retirement at the end of 2026; keep
+SDK 0.7.x for historical legacy call IDs. Upgrade Goal Run integrations to 1.0
+as well: old wait helpers can time out when both `result` and `error` are null.
 
 ```typescript
 const call = await client.calls.createAndWait({
@@ -195,14 +247,14 @@ else console.log(call.error);
 // await client.calls.cancel(callId);
 ```
 
-Replace `recipient` / `recipients` with `phone`, `region`, and `locale`.
+Replace `recipient` / `recipients` with `phone` and optional `region` and `locale`.
 Define the required `result_schema` (`resultSchema` in TypeScript) using Goal's
 `calle.result.scalar-object.v1` profile: at most 32 scalar properties and
 `additionalProperties: false`. Flatten old nested fields; arrays and null values
 are unsupported. Old `structured_result`, `result_error`, summary,
 confidence and provider attempt fields are removed. Request business summaries or
 completion flags explicitly as scalar fields in the schema when needed.
-Batch and recurring workflows belong to reusable Goals.
+The Calls API does not support batch, scheduled or recurring calls.
 
 Calls and Goal Runs always expose `transcript`, an array of recorded turns with
 `speaker` (`bot`, `user`, `unknown`), nullable `offset_seconds`, and `text`.
@@ -223,37 +275,50 @@ Calls accept immediate execution only. If authorization expires after submission
 `error.detail_code=authorization_expired` means the provider may still complete the call; do not
 create an automatic replacement call.
 
+## Error handling
+
+The SDK exports typed errors for API responses, authentication, rate limits,
+polling timeouts, and missing response bodies:
+
+```ts
+import { CalleAPIError, CalleClient } from "@call-e/calle";
+
+const client = new CalleClient({ apiKey: process.env.CALLE_API_KEY! });
+
+try {
+  await client.calls.get("call_123");
+} catch (error) {
+  if (error instanceof CalleAPIError) {
+    console.error(error.status, error.code, error.details);
+  }
+  throw error;
+}
+```
+
 ## Release
 
 This repository publishes the npm package `@call-e/calle`.
 
-See [RELEASE.md](./RELEASE.md) for the release checklist, GitHub Actions
-workflow, and post-publish install smoke test.
+Merging to `main` runs CI and does not publish the package. Publishing a GitHub
+Release with a matching `vX.Y.Z` tag starts the npm release workflow. Manual
+workflow runs are dry runs only. See [RELEASE.md](./RELEASE.md) for release
+gates and registry checks.
 
-Prerequisites:
+## Support and security
 
-- Create an npm automation token or granular access token that can publish
-  `@call-e/calle`.
-- Add it to this repository as the GitHub Actions secret `NPM_TOKEN`.
-- Keep the package version in `package.json` unique before each publish.
-
-Manual stable publish:
-
-1. Confirm `package.json` has a unique stable version.
-2. Open the `Publish npm package` GitHub Actions workflow.
-3. Run it from `main` with tag `latest`.
-4. Verify install in a temporary project:
-
-```bash
-pnpm add @call-e/calle
-node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; console.log(typeof CalleClient)'
-```
-
-The current stable version is `0.7.0`. Do not reuse a previously published npm
-version.
+Use [GitHub Issues](https://github.com/CALLE-AI/server-sdk-typescript/issues)
+for reproducible SDK bugs and feature requests. Do not report vulnerabilities
+in a public issue. Follow [SECURITY.md](./SECURITY.md) for private reporting.
 
 ## Project Documents
 
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
+- [CHANGELOG.md](./CHANGELOG.md)
 - [SECURITY.md](./SECURITY.md)
 - [RELEASE.md](./RELEASE.md)
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE). The same license
+applies to the published npm packages `@call-e/calle@0.6.0` and
+`@call-e/calle@0.7.0`.

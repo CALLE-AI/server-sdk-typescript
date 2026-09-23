@@ -10,15 +10,23 @@ pnpm install
 pnpm run validate
 ```
 
+The validation command runs the tests and type checks, scans tracked files for
+public-repository hygiene issues, builds the package, and smoke-tests the
+generated tarball. The tarball is ignored by Git.
+
 ## Local examples
 
+Replace the sample credentials with your own key before running. Read
+[API keys and diagnostic output](./README.md#api-keys-and-diagnostic-output)
+before sharing example output.
+
 ```bash
-export CALLE_API_KEY="calle_test_key"
+export CALLE_API_KEY="<YOUR_CALLE_API_KEY>"
 export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_EXAMPLE_PHONE="+14155550100"
 pnpm run example:create-and-wait
 
-export CALLE_BASE_URL="https://test-api.heycall-e.com"
+export CALLE_BASE_URL="https://api.heycall-e.com"
 export CALLE_GOAL_ID="<PUBLISHED_GOAL_ID>"
 export CALLE_EXAMPLE_PHONE="<E164_PHONE>"
 export CALLE_GOAL_VARIABLES='{"name":"Alex"}'
@@ -36,19 +44,18 @@ includes the finalized post-call outcome and requested structured results.
 
 In scope:
 
-- Create a call.
+- Create a call, including multiple recipients when the account has an eligible
+  purchased number selected as its default outbound number.
 - Read a call.
 - Poll until a terminal call result.
 - List call events.
 - List and read published Goals.
-- Create and poll Goal Runs until either `result` or `error` is available.
+- Create and poll Goal Runs until `result_status` is no longer `pending`.
 - Receive terminal webhook events.
 
 Out of scope:
 
 - Browser SDK support.
-- Batch calls.
-- Cancel calls.
 - Recurring or scheduled calls.
 - Project-level webhook management.
 - Zod result schema helpers.
@@ -64,6 +71,10 @@ When the OpenAPI contract changes:
 3. Update wrappers and tests for any changed behavior.
 4. Run the full development check list above.
 
+Add a concise entry under `Unreleased` in `CHANGELOG.md` for user-visible SDK
+changes. Do not invent entries for releases that are not documented in this
+repository.
+
 ## Pull requests
 
 Keep changes small and focused. Include tests for wrapper behavior, error
@@ -71,3 +82,16 @@ handling, webhook event handling, and any changed API contract surface.
 
 Do not add browser examples or patterns that expose CALL-E API keys to client
 code.
+
+Do not include private GitLab or collaboration links, raw non-loopback HTTP IP
+addresses, or references to CALLE-AI repositories that have not been confirmed
+public. The hygiene workflow checks tracked text plus the pull request title
+and body, including after the pull request description is edited. Its findings
+report only the location and violation type.
+
+Maintainers publish stable packages from a matching `vX.Y.Z` GitHub Release.
+Manual runs of the publish workflow are dry runs only. See [RELEASE.md](./RELEASE.md)
+for the release and dist-tag procedures.
+
+Unless stated otherwise, contributions are provided under the repository's
+[MIT License](./LICENSE).

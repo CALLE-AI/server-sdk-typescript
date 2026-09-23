@@ -320,7 +320,7 @@ function formatError(error: unknown): string {
 }
 
 function isCallResultReady(call: Call): boolean {
-  return call.result !== null || call.error !== null;
+  return call.resultStatus !== "pending";
 }
 
 async function sleep(ms: number): Promise<void> {
