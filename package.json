@@ -59,7 +59,7 @@
     "url": "https://github.com/CALLE-AI/server-sdk-typescript/issues"
   },
   "dependencies": {
-    "openapi-fetch": "^0.14.0"
+    "openapi-fetch": "^0.17.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
