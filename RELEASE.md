@@ -86,9 +86,10 @@ retrying that exact request. Record the returned Goal Run id and verify that
 
 ## Post-publish verification
 
-The workflow waits for exact-version registry metadata, installs the published
-package in a temporary project, imports `CalleClient`, and runs the packaged
-CLI help command.
+The workflow polls registry metadata and installation availability at ten-second
+intervals for up to 30 attempts each. Checks prefer fresh registry responses
+over cached preflight metadata. It installs the published package in a temporary
+project, imports `CalleClient`, and runs the packaged CLI help command.
 
 A failure in either post-publish check does not mean publication failed. If the
 `npm publish` step succeeded, do not retry the same version. Check the registry

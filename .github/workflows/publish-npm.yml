@@ -269,9 +269,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          for attempt in {1..10}; do
-            visible_version="$(npm view "@call-e/calle@${PACKAGE_VERSION}" version 2>/dev/null || true)"
-            latest_version="$(npm view '@call-e/calle' dist-tags.latest 2>/dev/null || true)"
+          for attempt in {1..30}; do
+            visible_version="$(npm view "@call-e/calle@${PACKAGE_VERSION}" version --prefer-online --registry https://registry.npmjs.org 2>/dev/null || true)"
+            latest_version="$(npm view '@call-e/calle' dist-tags.latest --prefer-online --registry https://registry.npmjs.org 2>/dev/null || true)"
             if [[ "$visible_version" == "$PACKAGE_VERSION" && "$latest_version" == "$PACKAGE_VERSION" ]]; then
               exit 0
             fi
@@ -294,8 +294,8 @@ jobs:
           cd "$smoke_dir"
           npm init -y >/dev/null
 
-          for attempt in {1..10}; do
-            if npm install --ignore-scripts --no-audit --no-fund "@call-e/calle@${PACKAGE_VERSION}"; then
+          for attempt in {1..30}; do
+            if npm install --prefer-online --registry https://registry.npmjs.org --ignore-scripts --no-audit --no-fund "@call-e/calle@${PACKAGE_VERSION}"; then
               if node --input-type=module -e 'import { CalleClient } from "@call-e/calle"; const client = new CalleClient({ apiKey: "smoke" }); if (typeof client.goals.runAndWait !== "function") process.exit(1);' && ./node_modules/.bin/calle --help | grep "Usage:" >/dev/null; then
                 exit 0
               fi
