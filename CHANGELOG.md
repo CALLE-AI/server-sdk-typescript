@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-09-23
+
+### Fixed
+
+- Publish the validated local tarball using an explicit relative path so npm
+  does not interpret the artifact directory as a GitHub repository.
+- Exercise the nested artifact path in the publish dry run for every release.
+- Remove the separate deployment approval; CI, release-source validation and
+  registry version checks still gate publication.
+
 ## [1.0.0] - 2026-09-23
 
 ### Changed

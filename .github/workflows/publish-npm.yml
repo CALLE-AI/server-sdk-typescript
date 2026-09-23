@@ -140,10 +140,12 @@ jobs:
           echo "artifact_name=npm-package-${PACKAGE_VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Dry run npm publish
-        if: github.event_name == 'workflow_dispatch'
         env:
           TARBALL: ${{ steps.package.outputs.tarball }}
-        run: npm publish "$TARBALL" --access public --tag latest --dry-run --registry https://registry.npmjs.org
+        run: |
+          mkdir -p artifact
+          cp "$TARBALL" artifact/
+          npm publish "./artifact/$TARBALL" --access public --tag latest --dry-run --registry https://registry.npmjs.org
 
       - name: Upload validated package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -259,7 +261,7 @@ jobs:
             exit 1
           fi
 
-          npm publish "${tarballs[0]}" --access public --tag latest --registry https://registry.npmjs.org
+          npm publish "./${tarballs[0]}" --access public --tag latest --registry https://registry.npmjs.org
 
       - name: Verify published package metadata
         env:

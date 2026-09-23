@@ -14,8 +14,9 @@ workflow. Configure the trusted publisher on npm with:
 - Environment name: `npm`
 - Allowed action: `npm publish`
 
-The GitHub `npm` environment should require maintainer approval and allow
-deployments only from `main` and `v*` release tags. The publish job uses OIDC
+The GitHub `npm` environment has no required reviewers and allows deployments
+only from `main` and `v*` release tags. Publishing a versioned GitHub Release
+starts publication automatically after validation. The publish job uses OIDC
 and does not read a long-lived npm token. `NPM_TOKEN` is retained only for the
 separate, manually invoked dist-tag management workflow.
 
@@ -55,9 +56,13 @@ release. Package publication and manual dist-tag changes share one concurrency
 lock.
 
 The build job validates and packs once, then uploads exactly one tarball and a
-SHA-256 manifest. After environment approval, the publish job downloads that
+SHA-256 manifest. After validation, the publish job downloads that
 artifact and rechecks its file set, checksum, package version, and MIT license
 before publishing it with the `latest` dist-tag.
+
+Every build dry-runs publication from the same nested artifact directory used
+by the publish job. Prefix local tarball paths with `./` (or use an absolute
+path): npm can interpret `artifact/package.tgz` as GitHub shorthand.
 
 ## Test API Goal smoke
 

@@ -38,7 +38,7 @@ Empty `{}` is a ready result. Webhook data matches the persisted GET snapshot.
 Install the stable package from npm:
 
 ```bash
-pnpm add @call-e/calle@1.0.0
+pnpm add @call-e/calle@1.0.1
 ```
 
 Use a local checkout for development and package smoke tests:
@@ -128,7 +128,7 @@ when retrying the same logical request.
 Run the installed CLI:
 
 ```bash
-npx @call-e/calle@1.0.0 calls create \
+npx @call-e/calle@1.0.1 calls create \
   --api-key "$CALLE_API_KEY" \
   --base-url "https://api.heycall-e.com" \
   --phone "<AUTHORIZED_E164_PHONE>" \
@@ -149,7 +149,7 @@ developer events returned by the call events API.
 Query an existing call:
 
 ```bash
-npx @call-e/calle@1.0.0 calls get call_123 --json
+npx @call-e/calle@1.0.1 calls get call_123 --json
 ```
 
 Run the webhook receiver example:
@@ -210,7 +210,7 @@ if (run.result !== null) {
 Run the same published Goal through the CLI:
 
 ```bash
-npx @call-e/calle@1.0.0 goals run \
+npx @call-e/calle@1.0.1 goals run \
   --goal-id "goal_delivery_confirmation" \
   --phone "<AUTHORIZED_E164_PHONE>" \
   --variables '{"customer_name":"Taylor","order_reference":"ORD-8472","delivery_window":"July 24, 2:00-4:00 PM"}' \
