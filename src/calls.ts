@@ -1,7 +1,12 @@
 import createClient, { type Client } from "openapi-fetch";
 import type { GoalResult, GoalRunError } from "./goals.js";
 import type { components, paths } from "./generated/schema.js";
-import { CalleConnectionError, CalleTimeoutError, apiErrorFromResponse } from "./errors.js";
+import {
+  CalleAPIError,
+  CalleConnectionError,
+  CalleTimeoutError,
+  apiErrorFromResponse
+} from "./errors.js";
 
 type ApiCall = components["schemas"]["AgenticCall"];
 type ApiCreateCallRequest = components["schemas"]["CreateAgenticCallRequest"];
@@ -106,6 +111,29 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function wrapFetch(fetchImpl: FetchLike): FetchLike {
+  return (async (input: Request, init?: RequestInit) => {
+    try {
+      return await (fetchImpl as (input: Request, init?: RequestInit) => Promise<Response>)(input, init);
+    } catch (error) {
+      if (
+        error instanceof CalleConnectionError ||
+        error instanceof CalleAPIError ||
+        error instanceof CalleTimeoutError
+      ) {
+        throw error;
+      }
+      const detail = error instanceof Error && error.message ? error.message : "unknown error";
+      throw new CalleConnectionError(`CALL-E API request failed: ${detail}`);
+    }
+  }) as FetchLike;
+}
+
+function attachCallId<T extends { callId?: string }>(error: T, callId: string): T {
+  error.callId = callId;
+  return error;
+}
+
 export class CalleCalls {
   private readonly client: Client<paths>;
 
@@ -120,9 +148,7 @@ export class CalleCalls {
         authorization: `Bearer ${input.apiKey}`
       }
     };
-    if (input.fetch !== undefined) {
-      clientOptions.fetch = input.fetch;
-    }
+    clientOptions.fetch = wrapFetch(input.fetch ?? ((request) => globalThis.fetch(request)));
     this.client = createClient<paths>(clientOptions);
   }
 
@@ -202,11 +228,23 @@ export class CalleCalls {
       }
       await sleep(intervalMs);
     }
-    throw new CalleTimeoutError(`Timed out waiting for CALL-E call ${callId}.`);
+    throw new CalleTimeoutError(`Timed out waiting for CALL-E call ${callId}.`, callId);
   }
 
   async createAndWait(input: CreateCallInput, options: RequestOptions & WaitOptions): Promise<Call> {
     const call = await this.create(input, options);
-    return await this.waitForResult(call.id, options);
+    try {
+      return await this.waitForResult(call.id, options);
+    } catch (error) {
+      if (
+        error instanceof CalleAPIError ||
+        error instanceof CalleConnectionError ||
+        error instanceof CalleTimeoutError
+      ) {
+        throw attachCallId(error, call.id);
+      }
+      const detail = error instanceof Error && error.message ? error.message : "unknown error";
+      throw new CalleConnectionError(`CALL-E wait failed: ${detail}`, call.id);
+    }
   }
 }

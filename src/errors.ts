@@ -2,13 +2,17 @@ export class CalleAPIError extends Error {
   readonly code: string;
   readonly status: number;
   readonly details: Record<string, unknown>;
+  callId?: string;
 
-  constructor(input: { code: string; message: string; status: number; details?: Record<string, unknown> }) {
+  constructor(input: { code: string; message: string; status: number; details?: Record<string, unknown>; callId?: string }) {
     super(input.message);
     this.name = "CalleAPIError";
     this.code = input.code;
     this.status = input.status;
     this.details = input.details ?? {};
+    if (input.callId !== undefined) {
+      this.callId = input.callId;
+    }
   }
 }
 
@@ -27,16 +31,26 @@ export class CalleRateLimitError extends CalleAPIError {
 }
 
 export class CalleTimeoutError extends Error {
-  constructor(message: string) {
+  callId?: string;
+
+  constructor(message: string, callId?: string) {
     super(message);
     this.name = "CalleTimeoutError";
+    if (callId !== undefined) {
+      this.callId = callId;
+    }
   }
 }
 
 export class CalleConnectionError extends Error {
-  constructor(message: string) {
+  callId?: string;
+
+  constructor(message: string, callId?: string) {
     super(message);
     this.name = "CalleConnectionError";
+    if (callId !== undefined) {
+      this.callId = callId;
+    }
   }
 }
 
