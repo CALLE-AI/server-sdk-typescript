@@ -202,4 +202,123 @@ describe("CalleClient calls", () => {
       CalleTimeoutError
     );
   });
+
+  it("does not sleep past the requested timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      const queued = {
+        ...completedCall,
+        status: "queued",
+        call_outcome: null,
+        result_status: "pending",
+        result: null,
+        completed_at: null
+      };
+      const fetchMock = vi.fn(async () => jsonResponse(queued));
+      const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
+      const waiting = client.calls.waitForResult("call_123", {
+        intervalMs: 1000,
+        timeoutMs: 25
+      });
+      const assertion = expect(waiting).rejects.toBeInstanceOf(CalleTimeoutError);
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("aborts an in-flight poll when the wait deadline expires", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = input instanceof Request ? input : new Request(input, init);
+        return await new Promise<Response>((_resolve, reject) => {
+          request.signal.addEventListener(
+            "abort",
+            () => reject(new Error("request aborted")),
+            { once: true }
+          );
+        });
+      });
+      const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
+      const waiting = client.calls.waitForResult("call_123", {
+        intervalMs: 1000,
+        timeoutMs: 25
+      });
+      const assertion = expect(waiting).rejects.toBeInstanceOf(CalleTimeoutError);
+
+      await vi.advanceTimersByTimeAsync(25);
+
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const request = fetchMock.mock.calls[0]?.[0];
+      expect(request).toBeInstanceOf(Request);
+      expect((request as Request).signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not return a completed body that arrives after the deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(async () => {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 180);
+        });
+        return jsonResponse(completedCall);
+      });
+      const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
+      const waiting = client.calls.waitForResult("call_123", {
+        intervalMs: 180,
+        timeoutMs: 30
+      });
+      const assertion = expect(waiting).rejects.toBeInstanceOf(CalleTimeoutError);
+
+      await vi.advanceTimersByTimeAsync(180);
+
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const request = fetchMock.mock.calls[0]?.[0];
+      expect(request).toBeInstanceOf(Request);
+      expect((request as Request).signal.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    { options: { intervalMs: 0 }, name: "zero intervalMs" },
+    { options: { intervalMs: Number.NaN }, name: "NaN intervalMs" },
+    { options: { timeoutMs: 0 }, name: "zero timeoutMs" },
+    { options: { timeoutMs: Number.POSITIVE_INFINITY }, name: "infinite timeoutMs" }
+  ])("rejects $name before polling", async ({ options }) => {
+    const fetchMock = vi.fn(async () => jsonResponse(completedCall));
+    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
+
+    await expect(client.calls.waitForResult("call_123", options)).rejects.toBeInstanceOf(RangeError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid create-and-wait options before creating a call", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(completedCall));
+    const client = new CalleClient({ apiKey: "key_test", baseUrl: "https://api.heycall-e.com", fetch: fetchMock });
+
+    await expect(
+      client.calls.createAndWait(
+        {
+          task: "Call.",
+          phone: "+14155550100",
+          region: "US",
+          locale: "en-US",
+          resultSchema: { type: "object", additionalProperties: false, properties: {} }
+        },
+        { idempotencyKey: "wf_123", timeoutMs: Number.NaN }
+      )
+    ).rejects.toBeInstanceOf(RangeError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

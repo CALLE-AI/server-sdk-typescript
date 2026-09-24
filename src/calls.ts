@@ -106,6 +106,23 @@ async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function requirePositiveDuration(value: number, name: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`${name} must be a finite positive number.`);
+  }
+  return value;
+}
+
+function waitDurations(options: WaitOptions): {
+  intervalMs: number;
+  timeoutMs: number;
+} {
+  return {
+    intervalMs: requirePositiveDuration(options.intervalMs ?? 2000, "intervalMs"),
+    timeoutMs: requirePositiveDuration(options.timeoutMs ?? 600000, "timeoutMs")
+  };
+}
+
 export class CalleCalls {
   private readonly client: Client<paths>;
 
@@ -147,9 +164,15 @@ export class CalleCalls {
   }
 
   async get(callId: string): Promise<Call> {
-    const response = await this.client.GET("/v2/calls/{call_id}", {
-      params: { path: { call_id: callId } }
-    });
+    return await this.getWithSignal(callId);
+  }
+
+  private async getWithSignal(callId: string, signal?: AbortSignal): Promise<Call> {
+    const params = { path: { call_id: callId } };
+    const response =
+      signal === undefined
+        ? await this.client.GET("/v2/calls/{call_id}", { params })
+        : await this.client.GET("/v2/calls/{call_id}", { params, signal });
     if (response.error) {
       throw apiErrorFromResponse(response.response.status, response.error);
     }
@@ -192,20 +215,44 @@ export class CalleCalls {
   }
 
   async waitForResult(callId: string, options: WaitOptions = {}): Promise<Call> {
-    const intervalMs = options.intervalMs ?? 2000;
-    const timeoutMs = options.timeoutMs ?? 600000;
+    const { intervalMs, timeoutMs } = waitDurations(options);
     const deadline = Date.now() + timeoutMs;
-    while (Date.now() <= deadline) {
-      const call = await this.get(callId);
+    while (true) {
+      const remainingBeforeRequest = deadline - Date.now();
+      if (remainingBeforeRequest <= 0) {
+        break;
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), remainingBeforeRequest);
+      let call: Call;
+      try {
+        call = await this.getWithSignal(callId, controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          throw new CalleTimeoutError(`Timed out waiting for CALL-E call ${callId}.`);
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (controller.signal.aborted) {
+        throw new CalleTimeoutError(`Timed out waiting for CALL-E call ${callId}.`);
+      }
       if (call.resultStatus !== "pending") {
         return call;
       }
-      await sleep(intervalMs);
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        break;
+      }
+      await sleep(Math.min(intervalMs, remainingMs));
     }
     throw new CalleTimeoutError(`Timed out waiting for CALL-E call ${callId}.`);
   }
 
   async createAndWait(input: CreateCallInput, options: RequestOptions & WaitOptions): Promise<Call> {
+    waitDurations(options);
     const call = await this.create(input, options);
     return await this.waitForResult(call.id, options);
   }
